@@ -317,4 +317,4 @@ This project is licensed under the **GPL-3.0 License**. See the [LICENSE](LICENS
 ## Contact
 For questions, bug reports, or feature requests, contact:
 
-**Zelin Liu** – liuz6@chop.edu
+**Zelin Liu** – zlliu95@outlook.com
