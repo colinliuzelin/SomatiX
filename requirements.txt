@@ -1,0 +1,11 @@
+# Requirements (pip names)
+numpy
+pandas
+h5py
+pysam
+scikit-learn
+matplotlib
+progressbar33
+
+# Optional / user-managed: PyTorch (GPU builds often chosen manually)
+# torch
