@@ -1,4 +1,7 @@
-./example/*
+# Case-study downloaded/generated files.
+/example/
+somatix_latest.sif
+hap.py_latest.sif
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
