@@ -1,13 +1,13 @@
 # SomatiX
 
-SomatiX is a deep-learning variant caller for accurate and fast somatic SNV detection from **long-read DNA sequencing (tumor-control pair samples)**. It supports both **Oxford Nanopore (ONT)** and **Pacific Biosciences (PacBio)** platforms, with pretrained models for each technology type.
+SomatiX is a deep-learning variant caller for accurate and fast somatic SNV detection from **long-read DNA sequencing (tumor-normal pair samples)**. It supports both **Oxford Nanopore (ONT)** and **Pacific Biosciences (PacBio)** platforms, with pretrained models for each technology type.
 
 ## Contents
 
 - [Installation](#installation)
-- [Quick Start / Overview](#quick-start--overview)
+- [Quick Start and Overview](#quick-start-and-overview)
 - [Pretrained Models](#pretrained-models)
-- [Detailed CLI options](#detailed-cli-options)
+- [Detailed CLI Options](#detailed-cli-options)
   - [`somatix candidates`](#somatix-candidates)
   - [`somatix features`](#somatix-features)
   - [`somatix predict`](#somatix-predict)
@@ -16,7 +16,7 @@ SomatiX is a deep-learning variant caller for accurate and fast somatic SNV dete
   - [`somatix clean`](#somatix-clean)
 - [Case Study](#case-study)
 - [Outputs](#outputs)
-- [Resource notes](#resource-notes)
+- [Resource Notes](#resource-notes)
 - [License](#license)
 - [Contact](#contact)
 
@@ -27,7 +27,7 @@ SomatiX is a deep-learning variant caller for accurate and fast somatic SNV dete
 Supported OS: Linux.
 
 ### Option 1: Conda
-Ensure you have **Conda** installed, then  create and activate an environment from the included `environment.yml`:
+Ensure you have **Conda** installed, then create and activate an environment from the included `environment.yml`:
 
 ```bash
 conda env create -f environment.yml -n somatix
@@ -48,21 +48,19 @@ Ensure you have **Singularity** installed, then pull the `somatix` container to 
 
 ```bash
 singularity pull library://zelinliu/somatix/somatix:latest
-
 ```
 
-
-Also ensure your FASTA and BAM files are indexed (`samtools faidx` and `samtools index`).
+The Singularity image includes the required `allele_counter` binary. Also ensure your FASTA and BAM files are indexed (`samtools faidx` and `samtools index`).
 
 ---
 
-## Quick Start / Overview
+## Quick Start and Overview
 
 SomatiX provides a single CLI with these primary subcommands:
 
 - `candidates` — extract candidate SNVs from a BAM (uses `allele_counter`)
 - `features` — generate compact HDF5 shard feature files from a candidate table and BAM
-- `predict` — predict somatic/germline classes from paired case/control feature shards using a PyTorch model
+- `predict` — predict somatic/germline classes from paired tumor/normal feature shards using a PyTorch model
 - `perm` — experimental feature-testing command that predicts after permuting one selected feature group across samples
 - `call` — run the full pipeline (candidates -> features -> predict)
 - `clean` — remove intermediate files
@@ -101,7 +99,7 @@ benchmarking experiments that compare single-cell-line and multi-cancer model
 training.
 
 
-### 1) Extract candidates
+### 1) Extract Candidates
 
 ```bash
 somatix candidates \
@@ -113,7 +111,7 @@ somatix candidates \
 
 Outputs a tab-delimited candidate table (columns include chrom, pos, ref, alt, ref_reads, alt_reads, total_coverage, vaf, ...).
 
-### 2) Extract case and control features
+### 2) Extract Tumor and Normal Features
 
 ```bash
 # Case/tumor features at case candidate sites
@@ -124,23 +122,23 @@ somatix features \
   --output-prefix case_features \
   --filtered-prefix case_candidates.filtered
 
-# Control/normal features at the same case candidate sites
+# Normal features at the same tumor candidate sites
 somatix features \
   --candidates case_candidates.txt \
-  --bam sample_control.bam \
+  --bam sample_normal.bam \
   --ref reference.fa \
-  --output-prefix control_features \
+  --output-prefix normal_features \
   --filtered-prefix case_candidates.filtered
 ```
 
-The `features` subcommand processes one BAM per run. Run it once for the case/tumor BAM and once for the control/normal BAM, using the same `--candidates` and `--filtered-prefix` so both feature sets are aligned to the same variant loci. This generates directories like `case_features.chr1/shard_000000.h5`, `control_features.chr1/shard_000000.h5`, and `manifest.tsv` for each processed chromosome.
+The `features` subcommand processes one BAM per run. Run it once for the case/tumor BAM and once for the matched normal BAM, using the same `--candidates` and `--filtered-prefix` so both feature sets are aligned to the same variant loci. This generates directories like `case_features.chr1/shard_000000.h5`, `normal_features.chr1/shard_000000.h5`, and `manifest.tsv` for each processed chromosome.
 
-### 3) Predict from features
+### 3) Predict from Features
 
 ```bash
 somatix predict \
   --case-features-prefix case_features \
-  --control-features-prefix control_features \
+  --control-features-prefix normal_features \
   --variant-prefix case_candidates.filtered \
   --model somatix_model.pth \
   --output somatix_predict.txt \
@@ -149,12 +147,12 @@ somatix predict \
 
 Produces `somatix_predict.txt`, split somatic/germline tables, and VCFs: `somatix_predict.vcf`, `somatix_predict.somatic.vcf`, and `somatix_predict.germline.vcf`.
 
-### 4) Full pipeline
+### 4) Full Pipeline
 
 ```bash
 somatix call \
   --bam-case sample_case.bam \
-  --bam-control sample_control.bam \
+  --bam-control sample_normal.bam \
   --ref reference.fa \
   --model somatix_model.pth \
   --outdir ./somatix_out
@@ -162,7 +160,7 @@ somatix call \
 
 - Use `--skip-prediction` to stop after generating features and skip the DL prediction step.
 
-### 5) Clean intermediate files
+### 5) Clean Intermediate Files
 
 ```bash
 somatix clean --outdir ./somatix_out
@@ -170,7 +168,7 @@ somatix clean --outdir ./somatix_out
 
 ---
 
-## Detailed CLI options
+## Detailed CLI Options
 
 The CLI entrypoint supports `--version` at the top level:
 
@@ -222,12 +220,12 @@ Filter candidate variants and extract compact HDF5 feature shards from a BAM.
 
 ### `somatix predict`
 
-Predict somatic and germline classes from paired case/control HDF5 feature shards.
+Predict somatic and germline classes from paired tumor/normal HDF5 feature shards.
 
 | Parameter | Required | Default | Description |
 | --- | --- | --- | --- |
 | `--case-features-prefix` | Yes | N/A | Prefix for case feature shard directories, such as `case_features`. |
-| `--control-features-prefix` | Yes | N/A | Prefix for control feature shard directories, such as `control_features`. |
+| `--control-features-prefix` | Yes | N/A | Prefix for normal feature shard directories, such as `normal_features`. |
 | `--variant-prefix` | Yes | N/A | Prefix for filtered candidate tables used to align variants with feature shards. |
 | `--model` | Yes | N/A | PyTorch model checkpoint used for prediction. |
 | `--output` | Yes | N/A | Output prediction table path. |
@@ -249,12 +247,12 @@ analysis against a truth set.
 | Parameter | Required | Default | Description |
 | --- | --- | --- | --- |
 | `--case-features-prefix` | Yes | N/A | Prefix for case feature shard directories, such as `case_features`. |
-| `--control-features-prefix` | Yes | N/A | Prefix for control feature shard directories, such as `control_features`. |
+| `--control-features-prefix` | Yes | N/A | Prefix for normal feature shard directories, such as `normal_features`. |
 | `--variant-prefix` | Yes | N/A | Prefix for filtered candidate tables used to align variants with feature shards. |
 | `--model` | Yes | N/A | PyTorch model checkpoint used for prediction. |
 | `--output` | Yes | N/A | Output prediction table path. VCFs are written beside this file using the same convention as `predict`. |
 | `--feature` | Yes | N/A | One feature group to permute across samples. Allowed values are listed below. |
-| `--sample` | No | `both` | Which sample tower to permute: `case`, `control`, or `both`. |
+| `--sample` | No | `both` | Which sample tower to permute: `case`, `control`, or `both`. Here `control` refers to the matched normal sample tower. |
 | `--bam` | No | N/A | Optional BAM path passed to the prediction output/annotation step for VCF contigs. |
 | `--device` | No | `cpu` | Device for model inference, such as `cpu` or a CUDA device string. |
 | `--seed` | No | `2026` | Random seed used to shuffle sample order. |
@@ -284,12 +282,12 @@ Feature group details:
 
 ### `somatix call`
 
-Run the full pipeline: case candidate extraction, case/control feature extraction, and optional prediction.
+Run the full pipeline: case candidate extraction, paired tumor/normal feature extraction, and optional prediction.
 
 | Parameter | Required | Default | Description |
 | --- | --- | --- | --- |
 | `--bam-case` | Yes | N/A | Case/tumor BAM file. |
-| `--bam-control` | Yes | N/A | Control/normal BAM file. |
+| `--bam-control` | Yes | N/A | Matched normal BAM file. |
 | `--ref` | Yes | N/A | Indexed reference FASTA file. |
 | `--model` | Required unless `--skip-prediction` is set | N/A | PyTorch model checkpoint used for prediction. |
 | `--outdir` | Yes | N/A | Output directory for candidates, features, and prediction results. |
@@ -334,9 +332,9 @@ SomatiX calling, and candidate-restricted benchmarking, see
 - Tab-separated prediction table (annotated): `<output>.txt`
 - Split tables: `<output>.somatic.txt`, `<output>.germline.txt`
 - VCFs: `<output>.vcf`, `<output>.somatic.vcf`, `<output>.germline.vcf`
-- HDF5 shards: `shard_*.h5` under `case_features.chr*` and `control_features.chr*`, plus `manifest.tsv`.
+- HDF5 shards: `shard_*.h5` under `case_features.chr*` and `normal_features.chr*`, plus `manifest.tsv`.
 
-## Resource notes
+## Resource Notes
 
 - Tuning `--min-alt`, `--depth`, and `--chunk-bp` affects memory/runtime. For whole-genome data, use many threads and adjust shard sizes to trade memory for I/O.
 

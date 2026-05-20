@@ -1,6 +1,6 @@
 # SomatiX ONT Case Study
 
-This case study shows an example SomatiX workflow for matched tumor-control
+This case study shows an example SomatiX workflow for matched tumor-normal
 Oxford Nanopore Technologies (ONT) data. The example uses HCC1395 chromosome 1
 so that the commands can be run quickly and compared against the SEQC2 somatic
 truth set.
@@ -25,7 +25,7 @@ This case study uses:
 - a pretrained SomatiX ONT model checkpoint supplied by the user.
 
 SomatiX evaluates candidate SNVs from the tumor BAM and extracts paired tumor
-and control features at the same candidate sites. By default, the example uses
+and normal features at the same candidate sites. By default, the example uses
 the candidate definition used in the SomatiX manuscript analyses:
 
 - ALT reads at least 3;
@@ -38,10 +38,16 @@ the candidate definition used in the SomatiX manuscript analyses:
 
 ### Option 1: Conda
 
+If you have not cloned SomatiX yet, clone the repository first:
+
 ```bash
 git clone <SomatiX GitHub URL> SomatiX
 cd SomatiX
+```
 
+Then create and activate the Conda environment:
+
+```bash
 conda env create -f environment.yml -n somatix
 conda activate somatix
 pip install .
@@ -86,19 +92,9 @@ sudo dpkg -i apptainer_1.1.9_amd64.deb
 sudo apt -f install -y
 ```
 
-The commands below are written for a Conda/source checkout. To run the same
-commands with Singularity, prepend the command with:
-
-```bash
-singularity exec \
-  -B "${BASE}:${BASE}" \
-  -B "$(dirname "${MODEL}")":"$(dirname "${MODEL}")" \
-  "${SOMATIX_SIF}"
-```
-
-The Singularity image includes the required `allele_counter` binary. When using
-the container, omit the `--allele-counter` option and let SomatiX use the
-bundled default.
+The Singularity image includes the required `allele_counter` binary. The
+container command below uses the bundled default and does not require an
+external `--allele-counter` path.
 
 ## Download Example Input Data
 
@@ -106,6 +102,7 @@ bundled default.
 BASE="${PWD}/example/ont"
 INPUT_DIR="${BASE}/input"
 OUTPUT_DIR="${BASE}/output"
+SOMATIX_DIR="${PWD}"
 MODEL_DIR="${SOMATIX_DIR}/model"
 
 mkdir -p "${INPUT_DIR}" "${OUTPUT_DIR}"
@@ -119,7 +116,7 @@ wget -O "${INPUT_DIR}/GRCh38.chr1.fa" \
 wget -O "${INPUT_DIR}/GRCh38.chr1.fa.fai" \
   "${HTTPDIR}/GCA_000001405.15_GRCh38_no_alt_analysis_set.chr1.fna.fai"
 
-# HCC1395 ONT tumor-control BAM files.
+# HCC1395 ONT tumor-normal BAM files.
 wget -O "${INPUT_DIR}/HCC1395_ont.normal.chr1.bam" \
   "${HTTPDIR}/HCC1395_ont.normal.chr1.bam"
 wget -O "${INPUT_DIR}/HCC1395_ont.normal.chr1.bam.bai" \
@@ -152,14 +149,14 @@ MODEL_HCC1395="${MODEL_DIR}/somatix_ont_hcc1395.pth"
 MODEL="${MODEL_MULTICANCER}"
 
 # For a source/Conda run, use the allele_counter binary included in this checkout.
-# For a Singularity run, omit --allele-counter and use the binary bundled inside the image.
 ALLELE_COUNTER="${SOMATIX_DIR}/source/somatix/bin/allele_counter"
 ```
 
-## Run SomatiX With One Command
+## Run SomatiX with Conda
 
-The `call` subcommand runs candidate extraction, paired tumor/control feature
-extraction and prediction.
+The `call` subcommand runs candidate extraction, paired tumor/normal feature
+extraction and prediction. In a source/Conda checkout, use the local runner and
+the local `allele_counter` binary:
 
 ```bash
 ${PYTHON_BIN} "${SOMATIX_DIR}/source/somatix-runner.py" call \
@@ -168,6 +165,35 @@ ${PYTHON_BIN} "${SOMATIX_DIR}/source/somatix-runner.py" call \
   --ref "${REF}" \
   --model "${MODEL}" \
   --allele-counter "${ALLELE_COUNTER}" \
+  --outdir "${OUTPUT_DIR}/somatix_chr1" \
+  --region chr1 \
+  --threads "$(nproc)" \
+  --min-baseq 10 \
+  --min-mapq 20 \
+  --vaf 0.05 \
+  --min-alt 3 \
+  --min-total 3 \
+  --max-depth 5000 \
+  --shard-size 100000 \
+  --chunk-bp 1000
+```
+
+## Run SomatiX with Singularity
+
+When using the Singularity image, run the same `call` workflow inside the
+container. The image includes `allele_counter`, so no external
+`--allele-counter` argument is needed:
+
+```bash
+singularity exec \
+  -B "${BASE}:${BASE}" \
+  -B "${MODEL_DIR}:${MODEL_DIR}" \
+  "${SOMATIX_SIF}" \
+  somatix call \
+  --bam-case "${TUMOR_BAM}" \
+  --bam-control "${NORMAL_BAM}" \
+  --ref "${REF}" \
+  --model "${MODEL}" \
   --outdir "${OUTPUT_DIR}/somatix_chr1" \
   --region chr1 \
   --threads "$(nproc)" \
@@ -200,94 +226,7 @@ The standard VCF used for somatic benchmarking is:
 QUERY_VCF="${OUTPUT_DIR}/somatix_chr1/somatix_predict.vcf"
 ```
 
-## Run SomatiX Step By Step
-
-The full pipeline can also be run as separate candidate, feature and prediction
-steps. This is useful for debugging, reusing feature shards or running
-permutation feature tests.
-
-### 1. Candidate SNV Extraction
-
-```bash
-${PYTHON_BIN} "${SOMATIX_DIR}/source/somatix-runner.py" candidates \
-  --bam "${TUMOR_BAM}" \
-  --ref "${REF}" \
-  --output "${OUTPUT_DIR}/case_candidates.txt" \
-  --region chr1 \
-  --threads "$(nproc)" \
-  --allele-counter "${ALLELE_COUNTER}" \
-  --min-baseq 10 \
-  --min-mapq 20 \
-  --vaf 0.05 \
-  --min-alt 3 \
-  --min-total 3 \
-  --max-depth 5000
-```
-
-### 2. Tumor Feature Extraction
-
-```bash
-${PYTHON_BIN} "${SOMATIX_DIR}/source/somatix-runner.py" features \
-  --candidates "${OUTPUT_DIR}/case_candidates.txt" \
-  --bam "${TUMOR_BAM}" \
-  --ref "${REF}" \
-  --output-prefix "${OUTPUT_DIR}/case_features" \
-  --filtered-prefix "${OUTPUT_DIR}/case_candidates.filtered" \
-  --region chr1 \
-  --threads "$(nproc)" \
-  --min-baseq 10 \
-  --min-mapq 20 \
-  --vaf 0.05 \
-  --min-alt 3 \
-  --min-total 3 \
-  --shard-size 100000 \
-  --chunk-bp 1000
-```
-
-### 3. Control Feature Extraction
-
-The control BAM is processed at the same tumor candidate loci. Use the same
-`--candidates` and `--filtered-prefix` paths so tumor and control features stay
-aligned.
-
-```bash
-${PYTHON_BIN} "${SOMATIX_DIR}/source/somatix-runner.py" features \
-  --candidates "${OUTPUT_DIR}/case_candidates.txt" \
-  --bam "${NORMAL_BAM}" \
-  --ref "${REF}" \
-  --output-prefix "${OUTPUT_DIR}/control_features" \
-  --filtered-prefix "${OUTPUT_DIR}/case_candidates.filtered" \
-  --region chr1 \
-  --threads "$(nproc)" \
-  --min-baseq 10 \
-  --min-mapq 20 \
-  --vaf 0.05 \
-  --min-alt 3 \
-  --min-total 3 \
-  --shard-size 100000 \
-  --chunk-bp 1000
-```
-
-### 4. Prediction
-
-```bash
-${PYTHON_BIN} "${SOMATIX_DIR}/source/somatix-runner.py" predict \
-  --case-features-prefix "${OUTPUT_DIR}/case_features" \
-  --control-features-prefix "${OUTPUT_DIR}/control_features" \
-  --variant-prefix "${OUTPUT_DIR}/case_candidates.filtered" \
-  --model "${MODEL}" \
-  --output "${OUTPUT_DIR}/somatix_predict.txt" \
-  --bam "${TUMOR_BAM}" \
-  --region chr1
-```
-
-The prediction VCF is written next to the prediction table:
-
-```bash
-QUERY_VCF="${OUTPUT_DIR}/somatix_predict.vcf"
-```
-
-## Benchmark With som.py
+## Benchmark with som.py
 
 The following example benchmarks the SomatiX VCF against the SEQC2 HCC1395
 truth set using `som.py` from hap.py. Only chromosome 1 is evaluated.
@@ -335,7 +274,9 @@ were restricted to sites with at least three ALT reads and VAF at least 0.05
 from reads with mapping quality at least 20 and base quality at least 10.
 
 Use the helper script below to calculate TP, FP, FN, precision, recall and F1
-from the filtered `som.py` feature-table tags:
+from the filtered `som.py` feature-table tags. Run this command in the Conda
+environment used for the source workflow, or any Python environment that has the
+script requirements installed:
 
 ```bash
 python "${SOMATIX_DIR}/other_scripts/benchmark/candidate_restricted_sompy_metrics.py" \
@@ -355,10 +296,22 @@ python "${SOMATIX_DIR}/other_scripts/benchmark/candidate_restricted_sompy_metric
 ## Clean Intermediate Files
 
 If you only need the final prediction outputs, remove intermediate candidate
-and feature files with:
+and feature files.
+
+For Conda/source runs:
 
 ```bash
 ${PYTHON_BIN} "${SOMATIX_DIR}/source/somatix-runner.py" clean \
+  --outdir "${OUTPUT_DIR}/somatix_chr1"
+```
+
+For Singularity runs:
+
+```bash
+singularity exec \
+  -B "${BASE}:${BASE}" \
+  "${SOMATIX_SIF}" \
+  somatix clean \
   --outdir "${OUTPUT_DIR}/somatix_chr1"
 ```
 
