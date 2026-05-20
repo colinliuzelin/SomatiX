@@ -39,7 +39,7 @@ setup(
     long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     url="https://github.com/Xinglab/SomatiX",
-    license="GPL-3.0",
+    license="SomatiX Research Use License",
     packages=setuptools.find_packages(where="source"),
     package_dir={"": "source"},
     include_package_data=True,
@@ -52,7 +52,7 @@ setup(
     classifiers=[
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.12",
-        "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+        "License :: Other/Proprietary License",
         "Operating System :: POSIX :: Linux",
         "Environment :: Console",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
