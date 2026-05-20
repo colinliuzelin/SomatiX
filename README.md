@@ -7,6 +7,7 @@ SomatiX is a deep-learning variant caller for accurate and fast somatic SNV dete
 - [Installation](#installation)
 - [Quick Start and Overview](#quick-start-and-overview)
 - [Pretrained Models](#pretrained-models)
+- [Basic Usage](#basic-usage)
 - [Detailed CLI Options](#detailed-cli-options)
   - [`somatix candidates`](#somatix-candidates)
   - [`somatix features`](#somatix-features)
@@ -98,6 +99,7 @@ HCC1395-specific checkpoints are mainly intended for HCC1395-only analyses and
 benchmarking experiments that compare single-cell-line and multi-cancer model
 training.
 
+## Basic Usage
 
 ### 1) Extract Candidates
 
