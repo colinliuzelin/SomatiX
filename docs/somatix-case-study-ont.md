@@ -93,9 +93,12 @@ commands with Singularity, prepend the command with:
 singularity exec \
   -B "${BASE}:${BASE}" \
   -B "$(dirname "${MODEL}")":"$(dirname "${MODEL}")" \
-  -B "$(dirname "${ALLELE_COUNTER}")":"$(dirname "${ALLELE_COUNTER}")" \
   "${SOMATIX_SIF}"
 ```
+
+The Singularity image includes the required `allele_counter` binary. When using
+the container, omit the `--allele-counter` option and let SomatiX use the
+bundled default.
 
 ## Download Example Input Data
 
@@ -148,7 +151,8 @@ MODEL_MULTICANCER="${MODEL_DIR}/somatix_ont_multicancer.pth"
 MODEL_HCC1395="${MODEL_DIR}/somatix_ont_hcc1395.pth"
 MODEL="${MODEL_MULTICANCER}"
 
-# Use the bundled allele_counter binary by default.
+# For a source/Conda run, use the allele_counter binary included in this checkout.
+# For a Singularity run, omit --allele-counter and use the binary bundled inside the image.
 ALLELE_COUNTER="${SOMATIX_DIR}/source/somatix/bin/allele_counter"
 ```
 
