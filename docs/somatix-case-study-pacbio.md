@@ -1,17 +1,17 @@
-# SomatiX ONT Case Study
+# SomatiX PacBio HiFi Case Study
 
 This case study shows an example SomatiX workflow for matched tumor-normal
-Oxford Nanopore Technologies (ONT) data. The example uses HCC1395 chromosome 1
+Pacific Biosciences (PacBio) HiFi data. The example uses HCC1395 chromosome 1
 so that the commands can be run quickly and compared against the SEQC2 somatic
 truth set.
 
-For convenience and reproducibility, this example uses the same HCC1395 ONT
-case-study BAM files made available through the DeepSomatic GitHub case-study
-workflow. We thank the DeepSomatic team for providing rich public resources that
-support somatic variant-calling benchmarking.
+For convenience and reproducibility, this example uses the same HCC1395 PacBio
+HiFi case-study BAM files made available through the DeepSomatic GitHub
+case-study workflow. We thank the DeepSomatic team for providing rich public
+resources that support somatic variant-calling benchmarking.
 
-This document is for ONT. The PacBio HiFi version is available at
-[somatix-case-study-pacbio.md](somatix-case-study-pacbio.md).
+This document is for PacBio HiFi. The ONT version is available at
+[somatix-case-study-ont.md](somatix-case-study-ont.md).
 
 The commands below assume that you run the example from the SomatiX repository
 root:
@@ -24,10 +24,10 @@ cd /mnt/windows/mydata/data1/DNA_somatic/git/test_shard_chunk/SomatiX
 
 This case study uses:
 
-- matched HCC1395 tumor and normal ONT BAM files restricted to chromosome 1;
+- matched HCC1395 tumor and normal PacBio HiFi BAM files restricted to chromosome 1;
 - a GRCh38 chromosome 1 reference FASTA;
 - the SEQC2 HCC1395 high-confidence BED and somatic SNV truth VCF;
-- a pretrained SomatiX ONT model checkpoint supplied by the user.
+- a pretrained SomatiX PacBio HiFi model checkpoint supplied by the user.
 
 SomatiX evaluates candidate SNVs from the tumor BAM and extracts paired tumor
 and normal features at the same candidate sites. By default, the example uses
@@ -104,7 +104,7 @@ external `--allele-counter` path.
 ## Download Example Input Data
 
 ```bash
-BASE="${PWD}/example/ont"
+BASE="${PWD}/example/pacbio"
 INPUT_DIR="${BASE}/input"
 OUTPUT_DIR="${BASE}/output"
 SOMATIX_DIR="${PWD}"
@@ -121,15 +121,15 @@ wget -O "${INPUT_DIR}/GRCh38.chr1.fa" \
 wget -O "${INPUT_DIR}/GRCh38.chr1.fa.fai" \
   "${HTTPDIR}/GCA_000001405.15_GRCh38_no_alt_analysis_set.chr1.fna.fai"
 
-# HCC1395 ONT tumor-normal BAM files.
-wget -O "${INPUT_DIR}/HCC1395_ont.normal.chr1.bam" \
-  "${HTTPDIR}/HCC1395_ont.normal.chr1.bam"
-wget -O "${INPUT_DIR}/HCC1395_ont.normal.chr1.bam.bai" \
-  "${HTTPDIR}/HCC1395_ont.normal.chr1.bam.bai"
-wget -O "${INPUT_DIR}/HCC1395_ont.tumor.chr1.bam" \
-  "${HTTPDIR}/HCC1395_ont.tumor.chr1.bam"
-wget -O "${INPUT_DIR}/HCC1395_ont.tumor.chr1.bam.bai" \
-  "${HTTPDIR}/HCC1395_ont.tumor.chr1.bam.bai"
+# HCC1395 PacBio HiFi tumor-normal BAM files.
+wget -O "${INPUT_DIR}/HCC1395_pacbio.normal.chr1.bam" \
+  "${HTTPDIR}/HCC1395_pacbio.normal.chr1.bam"
+wget -O "${INPUT_DIR}/HCC1395_pacbio.normal.chr1.bam.bai" \
+  "${HTTPDIR}/HCC1395_pacbio.normal.chr1.bam.bai"
+wget -O "${INPUT_DIR}/HCC1395_pacbio.tumor.chr1.bam" \
+  "${HTTPDIR}/HCC1395_pacbio.tumor.chr1.bam"
+wget -O "${INPUT_DIR}/HCC1395_pacbio.tumor.chr1.bam.bai" \
+  "${HTTPDIR}/HCC1395_pacbio.tumor.chr1.bam.bai"
 
 # SEQC2 HCC1395 benchmark resources.
 wget -O "${INPUT_DIR}/high-confidence_sSNV_in_HC_regions_v1.2.vcf.gz" \
@@ -142,15 +142,15 @@ Set paths used by the remaining commands:
 
 ```bash
 REF="${INPUT_DIR}/GRCh38.chr1.fa"
-TUMOR_BAM="${INPUT_DIR}/HCC1395_ont.tumor.chr1.bam"
-NORMAL_BAM="${INPUT_DIR}/HCC1395_ont.normal.chr1.bam"
+TUMOR_BAM="${INPUT_DIR}/HCC1395_pacbio.tumor.chr1.bam"
+NORMAL_BAM="${INPUT_DIR}/HCC1395_pacbio.normal.chr1.bam"
 TRUTH_VCF="${INPUT_DIR}/high-confidence_sSNV_in_HC_regions_v1.2.vcf.gz"
 TRUTH_BED="${INPUT_DIR}/High-Confidence_Regions_v1.2.bed"
 
-# Provide one or both pretrained SomatiX ONT model checkpoints.
+# Provide one or both pretrained SomatiX PacBio HiFi model checkpoints.
 # The multi-cancer checkpoint is the default model for this case study.
-MODEL_MULTICANCER="${MODEL_DIR}/somatix_ont_multicancer.pth"
-MODEL_HCC1395="${MODEL_DIR}/somatix_ont_hcc1395.pth"
+MODEL_MULTICANCER="${MODEL_DIR}/somatix_pacbio_multicancer.pth"
+MODEL_HCC1395="${MODEL_DIR}/somatix_pacbio_hcc1395.pth"
 MODEL="${MODEL_MULTICANCER}"
 
 # For a source/Conda run, use the allele_counter binary included in this checkout.
@@ -170,7 +170,7 @@ ${PYTHON_BIN} "${SOMATIX_DIR}/source/somatix-runner.py" call \
   --ref "${REF}" \
   --model "${MODEL}" \
   --allele-counter "${ALLELE_COUNTER}" \
-  --outdir "${OUTPUT_DIR}/somatix_chr1" \
+  --outdir "${OUTPUT_DIR}/somatix_pacbio_chr1" \
   --region chr1 \
   --threads 24 \
   --min-baseq 10 \
@@ -199,7 +199,7 @@ singularity exec \
   --bam-control "${NORMAL_BAM}" \
   --ref "${REF}" \
   --model "${MODEL}" \
-  --outdir "${OUTPUT_DIR}/somatix_chr1" \
+  --outdir "${OUTPUT_DIR}/somatix_pacbio_chr1" \
   --region chr1 \
   --threads 24 \
   --min-baseq 10 \
@@ -215,20 +215,20 @@ singularity exec \
 Expected main outputs:
 
 ```text
-${OUTPUT_DIR}/somatix_chr1/case_candidates.chr1
-${OUTPUT_DIR}/somatix_chr1/case_candidates.filtered.chr1
-${OUTPUT_DIR}/somatix_chr1/case_features.chr1/
-${OUTPUT_DIR}/somatix_chr1/control_features.chr1/
-${OUTPUT_DIR}/somatix_chr1/somatix_predict.txt
-${OUTPUT_DIR}/somatix_chr1/somatix_predict.vcf
-${OUTPUT_DIR}/somatix_chr1/somatix_predict.somatic.vcf
-${OUTPUT_DIR}/somatix_chr1/somatix_predict.germline.vcf
+${OUTPUT_DIR}/somatix_pacbio_chr1/case_candidates.chr1
+${OUTPUT_DIR}/somatix_pacbio_chr1/case_candidates.filtered.chr1
+${OUTPUT_DIR}/somatix_pacbio_chr1/case_features.chr1/
+${OUTPUT_DIR}/somatix_pacbio_chr1/control_features.chr1/
+${OUTPUT_DIR}/somatix_pacbio_chr1/somatix_predict.txt
+${OUTPUT_DIR}/somatix_pacbio_chr1/somatix_predict.vcf
+${OUTPUT_DIR}/somatix_pacbio_chr1/somatix_predict.somatic.vcf
+${OUTPUT_DIR}/somatix_pacbio_chr1/somatix_predict.germline.vcf
 ```
 
 The standard VCF used for somatic benchmarking is:
 
 ```bash
-QUERY_VCF="${OUTPUT_DIR}/somatix_chr1/somatix_predict.vcf"
+QUERY_VCF="${OUTPUT_DIR}/somatix_pacbio_chr1/somatix_predict.vcf"
 ```
 
 ## Benchmark with som.py
@@ -240,7 +240,7 @@ truth set using `som.py` from hap.py. Only chromosome 1 is evaluated.
 HAP_PY_SIF="${PWD}/hap.py_latest.sif"
 singularity pull "${HAP_PY_SIF}" docker://pkrusche/hap.py:latest
 
-SOMPY_OUT="${OUTPUT_DIR}/sompy_output/somatix_chr1"
+SOMPY_OUT="${OUTPUT_DIR}/sompy_output/somatix_pacbio_chr1"
 mkdir -p "$(dirname "${SOMPY_OUT}")"
 
 singularity exec \
@@ -263,7 +263,7 @@ The main summary table is written to:
 ${SOMPY_OUT}.stats.csv
 ```
 
-An example ONT `som.py` summary table is shown below:
+An example PacBio `som.py` summary table is shown below:
 
 <table>
   <thead>
@@ -273,10 +273,10 @@ An example ONT `som.py` summary table is shown below:
   </thead>
   <tbody>
     <tr>
-      <td>SNVs</td><td>3440</td><td>2681</td><td>2630</td><td>51</td><td>810</td><td>0</td><td>0</td><td>0.764535</td><td>0.750138</td><td>0.778487</td><td>0.764535</td><td>0.980977</td><td>0.975275</td><td>0.985643</td><td>0</td><td>0</td><td>248956422</td><td>0.204855</td>
+      <td>SNVs</td><td>3440</td><td>3337</td><td>3203</td><td>134</td><td>237</td><td>0</td><td>0</td><td>0.931105</td><td>0.922277</td><td>0.939208</td><td>0.931105</td><td>0.959844</td><td>0.95278</td><td>0.966111</td><td>0</td><td>0</td><td>248956422</td><td>0.538247</td>
     </tr>
     <tr>
-      <td>records</td><td>3440</td><td>2681</td><td>2630</td><td>51</td><td>810</td><td>0</td><td>0</td><td>0.764535</td><td>0.750138</td><td>0.778487</td><td>0.764535</td><td>0.980977</td><td>0.975275</td><td>0.985643</td><td>0</td><td>0</td><td>248956422</td><td>0.204855</td>
+      <td>records</td><td>3440</td><td>3337</td><td>3203</td><td>134</td><td>237</td><td>0</td><td>0</td><td>0.931105</td><td>0.922277</td><td>0.939208</td><td>0.931105</td><td>0.959844</td><td>0.95278</td><td>0.966111</td><td>0</td><td>0</td><td>248956422</td><td>0.538247</td>
     </tr>
   </tbody>
 </table>
@@ -304,11 +304,11 @@ script requirements installed:
 ```bash
 python "${SOMATIX_DIR}/other_scripts/benchmark/candidate_restricted_sompy_metrics.py" \
   --sompy-features "${SOMPY_OUT}.features.csv" \
-  --candidates "${OUTPUT_DIR}/somatix_chr1/case_candidates.filtered.chr1" \
-  --output "${OUTPUT_DIR}/sompy_output/somatix_chr1.candidate_restricted_metrics.csv" \
-  --filtered-features-output "${OUTPUT_DIR}/sompy_output/somatix_chr1.candidate_restricted_features.csv" \
+  --candidates "${OUTPUT_DIR}/somatix_pacbio_chr1/case_candidates.filtered.chr1" \
+  --output "${OUTPUT_DIR}/sompy_output/somatix_pacbio_chr1.candidate_restricted_metrics.csv" \
+  --filtered-features-output "${OUTPUT_DIR}/sompy_output/somatix_pacbio_chr1.candidate_restricted_features.csv" \
   --sample-id HCC1395 \
-  --platform ONT \
+  --platform PacBio \
   --tool SomatiX \
   --data-type raw \
   --chrom chr1 \
@@ -316,11 +316,11 @@ python "${SOMATIX_DIR}/other_scripts/benchmark/candidate_restricted_sompy_metric
   --min-vaf 0.05
 ```
 
-An example ONT candidate-restricted summary table is shown below:
+An example PacBio candidate-restricted summary table is shown below:
 
 | sample_id | platform | tool | chrom | min_alt | min_vaf | candidate_sites | som.py SNV rows | rows in candidates | total.truth | total.query | tp | fp | fn | precision | recall | f1 |
 | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| HCC1395 | ONT | SomatiX | chr1 | 3 | 0.05 | 433638 | 3491 | 2732 | 2681 | 2681 | 2630 | 51 | 51 | 0.980977 | 0.980977 | 0.980977 |
+| HCC1395 | PacBio | SomatiX | chr1 | 3 | 0.05 | 316487 | 3574 | 3340 | 3206 | 3337 | 3203 | 134 | 3 | 0.959844 | 0.999064 | 0.979062 |
 
 ## Clean Intermediate Files
 
@@ -331,7 +331,7 @@ For Conda/source runs:
 
 ```bash
 ${PYTHON_BIN} "${SOMATIX_DIR}/source/somatix-runner.py" clean \
-  --outdir "${OUTPUT_DIR}/somatix_chr1"
+  --outdir "${OUTPUT_DIR}/somatix_pacbio_chr1"
 ```
 
 For Singularity runs:
@@ -341,7 +341,7 @@ singularity exec \
   -B "${BASE}:${BASE}" \
   "${SOMATIX_SIF}" \
   somatix clean \
-  --outdir "${OUTPUT_DIR}/somatix_chr1"
+  --outdir "${OUTPUT_DIR}/somatix_pacbio_chr1"
 ```
 
 ## Notes

@@ -1,7 +1,8 @@
 # Case-study downloaded/generated files.
+somatix.sif
 /example/
-somatix_latest.sif
-hap.py_latest.sif
+somatix_*.sif
+hap.py_*.sif
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -147,6 +148,9 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Singularity / Apptainer images generated locally
+*.sif
 
 # Spyder project settings
 .spyderproject

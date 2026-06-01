@@ -43,6 +43,18 @@ def check_required_files(files):
             sys.exit(1)
 
 
+def resolve_executable(path_or_name, label):
+    if not path_or_name:
+        logging.error(f"Missing executable for {label}")
+        sys.exit(1)
+    if os.path.sep in path_or_name:
+        return path_or_name
+    resolved = shutil.which(path_or_name)
+    if resolved:
+        return resolved
+    return path_or_name
+
+
 def normalize_chrom_name(chrom):
     chrom = str(chrom)
     if chrom.startswith("chr"):
@@ -60,6 +72,7 @@ def parse_target_chr_from_region(region=None):
 def run_extract_candidates(args):
     """Extract candidate SNVs from one BAM using the allele_counter backend."""
     ensure_directory_exists(os.path.dirname(args.output) or ".")
+    args.allele_counter = resolve_executable(args.allele_counter, "allele_counter")
     check_required_files([args.bam, args.ref, args.allele_counter])
 
     logging.info("Extracting candidate variants")
@@ -281,6 +294,7 @@ def run_perm(args):
 
 def run_call(args):
     ensure_directory_exists(args.outdir)
+    args.allele_counter = resolve_executable(args.allele_counter, "allele_counter")
 
     required_files = [
         args.bam_case,
