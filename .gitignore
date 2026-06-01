@@ -1,6 +1,7 @@
 # Case-study downloaded/generated files.
 somatix.sif
 /example/
+singularity/
 somatix_*.sif
 hap.py_*.sif
 # Byte-compiled / optimized / DLL files
