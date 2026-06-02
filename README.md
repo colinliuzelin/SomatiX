@@ -62,7 +62,9 @@ Because the bundled binary is dynamically linked, it requires compatible system
 and `htslib` shared libraries at runtime, especially `glibc`, `libstdc++` and
 `libhts`. If the bundled binary fails to load because of missing or incompatible
 shared libraries, rebuild `allele_counter` from source on the target system or
-use the Singularity image.
+use the Singularity image. See
+[docs/allele-counter-troubleshooting.md](docs/allele-counter-troubleshooting.md)
+for build and library troubleshooting.
 
 ### Option 2: SingularityCE (recommended)
 Ensure you have **SingularityCE** installed, then pull the `somatix` container
