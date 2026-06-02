@@ -1,0 +1,78 @@
+Bootstrap: docker
+From: ubuntu:24.04
+
+%labels
+    Author Zelin Liu
+    Project SomatiX
+    Version 0.0.1
+    Repository https://github.com/colinliuzelin/SomatiX
+
+%post
+    set -e
+
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y --no-install-recommends \
+        bash \
+        bzip2 \
+        ca-certificates \
+        curl \
+        git \
+        libgomp1 \
+        libstdc++6 \
+        procps \
+        wget
+    rm -rf /var/lib/apt/lists/*
+
+    git clone --depth 1 https://github.com/colinliuzelin/SomatiX.git /opt/SomatiX
+
+    curl -L https://micro.mamba.pm/api/micromamba/linux-64/latest \
+        | tar -xvj -C /usr/local/bin --strip-components=1 bin/micromamba
+
+    micromamba create -y -p /opt/conda \
+        -c conda-forge \
+        -c bioconda \
+        python=3.12 \
+        numpy \
+        pandas \
+        h5py \
+        pysam \
+        scikit-learn \
+        matplotlib \
+        progressbar33 \
+        pytorch \
+        htslib
+    micromamba clean -a -y
+
+    chmod +x /opt/SomatiX/source/somatix-runner.py
+    chmod +x /opt/SomatiX/source/somatix/bin/allele_counter
+
+    ln -sf /opt/SomatiX/source/somatix/bin/allele_counter /usr/local/bin/allele_counter
+
+    if [ -e /opt/conda/lib/libhts.so.1.23.1 ]; then
+        ln -sf /opt/conda/lib/libhts.so.1.23.1 /usr/local/lib/libhts.so.3
+    elif [ -e /opt/conda/lib/libhts.so ]; then
+        ln -sf /opt/conda/lib/libhts.so /usr/local/lib/libhts.so.3
+    fi
+
+    cat > /usr/local/bin/somatix <<'EOF'
+#!/usr/bin/env bash
+export PATH="/opt/conda/bin:/usr/local/bin:${PATH}"
+export PYTHONPATH="/opt/SomatiX/source:${PYTHONPATH:-}"
+export LD_LIBRARY_PATH="/usr/local/lib:/opt/conda/lib:${LD_LIBRARY_PATH:-}"
+exec /opt/conda/bin/python /opt/SomatiX/source/somatix-runner.py "$@"
+EOF
+    chmod +x /usr/local/bin/somatix
+
+%environment
+    export PATH="/opt/conda/bin:/usr/local/bin:${PATH}"
+    export PYTHONPATH="/opt/SomatiX/source:${PYTHONPATH:-}"
+    export LD_LIBRARY_PATH="/usr/local/lib:/opt/conda/lib:${LD_LIBRARY_PATH:-}"
+
+%runscript
+    exec somatix "$@"
+
+%test
+    somatix --version
+    test -x /usr/local/bin/allele_counter
+    ldd /usr/local/bin/allele_counter | grep -qv "not found"
