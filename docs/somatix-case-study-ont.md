@@ -13,12 +13,8 @@ support somatic variant-calling benchmarking.
 This document is for ONT. The PacBio HiFi version is available at
 [somatix-case-study-pacbio.md](somatix-case-study-pacbio.md).
 
-The commands below assume that you run the example from the SomatiX repository
-root:
-
-```bash
-cd /mnt/windows/mydata/data1/DNA_somatic/git/test_shard_chunk/SomatiX
-```
+The commands below assume that you run the example from the root path of the
+SomatiX repository.
 
 ## Data Details
 
@@ -78,24 +74,17 @@ with:
 somatix
 ```
 
-### Option 2: Singularity
+### Option 2: SingularityCE
 
 ```bash
-singularity pull library://zelinliu/somatix/somatix:latest
+singularity pull library://zlliu95/somatix/somatix:latest
 SOMATIX_SIF="${PWD}/somatix_latest.sif"
 ```
 
-The example was tested with Apptainer/Singularity 1.1.9. If a local
-installation has problems converting Docker images to SIF format, the following
-commands install Apptainer 1.1.9 on Ubuntu/Debian systems:
-
-```bash
-cd /tmp
-wget https://github.com/apptainer/apptainer/releases/download/v1.1.9/apptainer_1.1.9_amd64.deb
-sudo apt remove -y singularity apptainer
-sudo dpkg -i apptainer_1.1.9_amd64.deb
-sudo apt -f install -y
-```
+Use SingularityCE for the `library://` pull command above. Apptainer is a
+separate fork of Singularity and may use a different default remote; an
+Apptainer binary exposed as `singularity` may not be able to pull from the
+Sylabs `library://` endpoint.
 
 The Singularity image includes the required `allele_counter` binary. The
 container command below uses the bundled default and does not require an
@@ -238,7 +227,7 @@ truth set using `som.py` from hap.py. Only chromosome 1 is evaluated.
 
 ```bash
 HAP_PY_SIF="${PWD}/hap.py_latest.sif"
-singularity pull "${HAP_PY_SIF}" docker://pkrusche/hap.py:latest
+singularity pull "${HAP_PY_SIF}" library://zlliu95/hap.py/hap.py:latest
 
 SOMPY_OUT="${OUTPUT_DIR}/sompy_output/somatix_chr1"
 mkdir -p "$(dirname "${SOMPY_OUT}")"

@@ -7,6 +7,7 @@ SomatiX is a deep-learning variant caller for accurate and fast somatic SNV dete
 - [Installation](#installation)
 - [Case Study](#case-study)
 - [Quick Start and Overview](#quick-start-and-overview)
+- [Model Architecture](#model-architecture)
 - [Pretrained Models](#pretrained-models)
 - [Basic Usage](#basic-usage)
 - [Detailed CLI Options](#detailed-cli-options)
@@ -44,7 +45,7 @@ Alternatively, after activating the **somatix** environment, run the somatix run
 python ./source/somatix-runner.py [OPTIONS]
 ```
 
-SomatiX candidate extraction uses `allele_counter`, a C/C++ executable written
+SomatiX candidate extraction uses `allele_counter`, a C++ executable written
 to speed up pileup-style allele counting from indexed BAM files. A precompiled
 Linux binary is provided at `source/somatix/bin/allele_counter` for convenience,
 and the source code is provided at `source/somatix/bin/allele_counter.cpp`.
@@ -54,12 +55,18 @@ and `htslib` shared libraries at runtime, especially `glibc`, `libstdc++` and
 shared libraries, rebuild `allele_counter` from source on the target system or
 use the Singularity image.
 
-### Option 2: Singularity (recommended)
-Ensure you have **Singularity** installed, then pull the `somatix` container to use it instantly without installation:
+### Option 2: SingularityCE (recommended)
+Ensure you have **SingularityCE** installed, then pull the `somatix` container
+from the Sylabs Library to use it instantly without installation:
 
 ```bash
-singularity pull library://zelinliu/somatix/somatix:latest
+singularity pull library://zlliu95/somatix/somatix:latest
 ```
+
+Use SingularityCE for this `library://` pull command. Apptainer is a separate
+fork of Singularity and may use a different default remote; an Apptainer binary
+exposed as `singularity` may not be able to pull from the Sylabs `library://`
+endpoint.
 
 The Singularity image embeds the required `allele_counter` binary and its
 runtime library environment, so users do not need to rebuild `allele_counter` or
@@ -91,6 +98,23 @@ SomatiX provides a single CLI with these primary subcommands:
 - `clean` — remove intermediate files
 
 The CLI entrypoint is the wrapper `source/somatix-runner.py` which calls `somatix/somatix.py`.
+
+## Model Architecture
+
+SomatiX uses paired tumor and matched-normal branches with the same feature
+definitions and network architecture. In each branch, the sequence/base-fraction
+tensor is processed by convolutional neural network layers, while coverage,
+base-quality, mapping-quality, mismatch-rate and target-position coverage
+features are incorporated through fully connected layers. The tumor and normal
+branch outputs are concatenated and passed through fully connected layers to
+produce four-class logits for reference, heterozygous germline, homozygous
+germline and somatic candidates.
+
+The current prediction architecture defines **382,720 trainable parameters**.
+Of these, **382,612 parameters are used by the active forward path**; the
+remaining 108 parameters belong to a defined raw target-coverage branch that is
+retained in the module for checkpoint compatibility but is not concatenated into
+the current classifier forward path.
 
 ## Pretrained Models
 
@@ -153,20 +177,20 @@ somatix features \
   --candidates case_candidates.txt \
   --bam sample_normal.bam \
   --ref reference.fa \
-  --output-prefix normal_features \
+  --output-prefix control_features \
   --filtered-prefix case_candidates.filtered
 ```
 
-The `features` subcommand processes one BAM per run. Run it once for the case/tumor BAM and once for the matched normal BAM, using the same `--candidates` and `--filtered-prefix` so both feature sets are aligned to the same variant loci. This generates directories like `case_features.chr1/shard_000000.h5`, `normal_features.chr1/shard_000000.h5`, and `manifest.tsv` for each processed chromosome.
+The `features` subcommand processes one BAM per run. Run it once for the case/tumor BAM and once for the matched normal BAM, using the same `--candidates` and `--filtered-prefix` so both feature sets are aligned to the same variant loci. This generates directories like `case_features.chr1/shard_000000.h5`, `control_features.chr1/shard_000000.h5`, and `manifest.tsv` for each processed chromosome.
 
 ### 3) Predict from Features
 
 ```bash
 somatix predict \
   --case-features-prefix case_features \
-  --control-features-prefix normal_features \
+  --control-features-prefix control_features \
   --variant-prefix case_candidates.filtered \
-  --model somatix_model.pth \
+  --model model/somatix_ont_multicancer.pth \
   --output somatix_predict.txt \
   --bam sample_case.bam
 ```
@@ -180,7 +204,7 @@ somatix call \
   --bam-case sample_case.bam \
   --bam-control sample_normal.bam \
   --ref reference.fa \
-  --model somatix_model.pth \
+  --model model/somatix_ont_multicancer.pth \
   --outdir ./somatix_out
 ```
 
@@ -214,7 +238,7 @@ Extract candidate SNVs from one BAM using the `allele_counter` backend.
 | `--region` | No | Whole genome | Optional genomic interval, for example `chr1:100000-200000`. |
 | `--threads` | No | `8` | Number of threads for candidate extraction. |
 | `--allele-counter` | No | `allele_counter` | Path to the `allele_counter` executable. |
-| `--min-alt` | No | `3` | Minimum alternate-read count required for a candidate. |
+| `--min-alt` | No | `3` | Minimum ALT-read count required for a candidate. |
 | `--min-vaf`, `--vaf` | No | `0.05` | Minimum variant allele fraction required for a candidate. |
 | `--min-total-coverage`, `--min-total` | No | `10` | Minimum total read coverage required for a candidate. |
 | `--min-mapq`, `--min-MQ` | No | `20` | Minimum read mapping quality used during candidate extraction. |
@@ -240,7 +264,7 @@ Filter candidate variants and extract compact HDF5 feature shards from a BAM.
 | `--chunk-bp` | No | `1000` | Genomic chunk size for chunk-based feature extraction. |
 | `--min-vaf`, `--vaf` | No | `0.05` | Minimum VAF retained when filtering the candidate table. |
 | `--min-total-coverage`, `--min-total` | No | `3` | Minimum total coverage retained when filtering the candidate table. |
-| `--min-alt` | No | `3` | Minimum alternate-read count retained when filtering the candidate table. |
+| `--min-alt` | No | `3` | Minimum ALT-read count retained when filtering the candidate table. |
 | `--shard-size` | No | `100000` | Maximum number of candidate records per HDF5 shard. |
 | `--compression` | No | `lzf` | HDF5 compression method; allowed values are `lzf` and `gzip`. |
 
@@ -251,7 +275,7 @@ Predict somatic and germline classes from paired tumor/normal HDF5 feature shard
 | Parameter | Required | Default | Description |
 | --- | --- | --- | --- |
 | `--case-features-prefix` | Yes | N/A | Prefix for case feature shard directories, such as `case_features`. |
-| `--control-features-prefix` | Yes | N/A | Prefix for normal feature shard directories, such as `normal_features`. |
+| `--control-features-prefix` | Yes | N/A | Prefix for matched-normal/control feature shard directories, such as `control_features`. |
 | `--variant-prefix` | Yes | N/A | Prefix for filtered candidate tables used to align variants with feature shards. |
 | `--model` | Yes | N/A | PyTorch model checkpoint used for prediction. |
 | `--output` | Yes | N/A | Output prediction table path. |
@@ -273,7 +297,7 @@ analysis against a truth set.
 | Parameter | Required | Default | Description |
 | --- | --- | --- | --- |
 | `--case-features-prefix` | Yes | N/A | Prefix for case feature shard directories, such as `case_features`. |
-| `--control-features-prefix` | Yes | N/A | Prefix for normal feature shard directories, such as `normal_features`. |
+| `--control-features-prefix` | Yes | N/A | Prefix for matched-normal/control feature shard directories, such as `control_features`. |
 | `--variant-prefix` | Yes | N/A | Prefix for filtered candidate tables used to align variants with feature shards. |
 | `--model` | Yes | N/A | PyTorch model checkpoint used for prediction. |
 | `--output` | Yes | N/A | Output prediction table path. VCFs are written beside this file using the same convention as `predict`. |
@@ -322,7 +346,7 @@ Run the full pipeline: case candidate extraction, paired tumor/normal feature ex
 | `--allele-counter` | No | `allele_counter` | Path to the `allele_counter` executable. |
 | `--device` | No | `cpu` | Device for model inference, such as `cpu` or a CUDA device string. |
 | `--skip-prediction` | No | `False` | Stop after candidate and feature extraction; do not run DL prediction. |
-| `--min-alt` | No | `3` | Minimum alternate-read count for candidate extraction and feature-input filtering. |
+| `--min-alt` | No | `3` | Minimum ALT-read count for candidate extraction and feature-input filtering. |
 | `--min-vaf`, `--vaf` | No | `0.05` | Minimum VAF for candidate extraction and feature-input filtering. |
 | `--min-total-coverage`, `--min-total` | No | `10` | Minimum total coverage for candidate extraction and feature-input filtering. |
 | `--min-mapq`, `--min-MQ` | No | `20` | Minimum read mapping quality used during candidate extraction. |
@@ -348,7 +372,7 @@ Remove intermediate files generated by `somatix call`.
 - Tab-separated prediction table (annotated): `<output>.txt`
 - Split tables: `<output>.somatic.txt`, `<output>.germline.txt`
 - VCFs: `<output>.vcf`, `<output>.somatic.vcf`, `<output>.germline.vcf`
-- HDF5 shards: `shard_*.h5` under `case_features.chr*` and `normal_features.chr*`, plus `manifest.tsv`.
+- HDF5 shards: `shard_*.h5` under `case_features.chr*` and `control_features.chr*`, plus `manifest.tsv`.
 
 ## Resource Notes
 
