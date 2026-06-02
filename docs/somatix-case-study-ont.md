@@ -42,7 +42,7 @@ the candidate definition used in the SomatiX manuscript analyses:
 If you have not cloned SomatiX yet, clone the repository first:
 
 ```bash
-git clone <SomatiX GitHub URL> SomatiX
+git clone git@github.com:colinliuzelin/SomatiX.git
 cd SomatiX
 ```
 

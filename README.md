@@ -29,7 +29,16 @@ SomatiX is a deep-learning variant caller for accurate and fast somatic SNV dete
 Supported OS: Linux.
 
 ### Option 1: Conda
-Ensure you have **Conda** installed, then create and activate an environment from the included `environment.yml`:
+First clone the repository, or download it from GitHub and enter the repository
+root:
+
+```bash
+git clone git@github.com:colinliuzelin/SomatiX.git
+cd SomatiX
+```
+
+Ensure you have **Conda** installed, then create and activate an environment
+from the included `environment.yml`:
 
 ```bash
 conda env create -f environment.yml -n somatix
