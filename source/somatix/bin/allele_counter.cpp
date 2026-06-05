@@ -1,7 +1,7 @@
 // allele_counter.cpp
 // Compile:
 //   g++ -O3 -std=c++17 allele_counter.cpp -o allele_counter -lhts -lz -lbz2 -llzma -lcurl -lpthread
-//   g++ -O3 -std=c++17 allele_counter.cpp -o allele_counter -I /home/colin/biotools/htslib-1.23.1  -L/home/colin/biotools/htslib-1.23.1   -lhts -lz -lbz2 -llzma -lcurl -lpthread
+//   make HTSLIB_DIR=/path/to/htslib
 #include <htslib/sam.h>
 #include <htslib/faidx.h>
 

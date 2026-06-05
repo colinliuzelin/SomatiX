@@ -1,10 +1,9 @@
-#!/scr1/users/liuz6/anaconda3/envs/xgboost/bin/python
+#!/usr/bin/env python3
 """
-Convenience wrapper for running nanoTM directly from source code.
+Convenience wrapper for running SomatiX directly from source code.
 """
 
 from somatix.somatix import main
- 
+
 if __name__ == '__main__':
     main()
-

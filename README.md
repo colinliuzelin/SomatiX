@@ -44,6 +44,21 @@ from the included `environment.yml`:
 conda env create -f environment.yml -n somatix
 conda activate somatix
 
+# IMPORTANT: `environment.yml` does NOT install PyTorch by default. Install
+# PyTorch separately to match your system CUDA runtime (or use a CPU-only
+# build). Example commands:
+
+```bash
+# CPU-only (conda, official PyTorch channel)
+conda install -y pytorch torchvision torchaudio cpuonly -c pytorch
+
+# CUDA 12.1 (example; change to the CUDA version you have)
+conda install -y pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
+
+# Or use pip with the appropriate wheel index (example for CUDA 11.8):
+pip install --index-url https://download.pytorch.org/whl/cu118 torch torchvision torchaudio
+```
+
 # Install somatix in this conda environment:
 pip install .                                    # installs in ~5 seconds
 ```
@@ -251,7 +266,7 @@ Extract candidate SNVs from one BAM using the `allele_counter` backend.
 | `--allele-counter` | No | `allele_counter` | Path to the `allele_counter` executable. |
 | `--min-alt` | No | `3` | Minimum ALT-read count required for a candidate. |
 | `--min-vaf`, `--vaf` | No | `0.05` | Minimum variant allele fraction required for a candidate. |
-| `--min-total-coverage`, `--min-total` | No | `10` | Minimum total read coverage required for a candidate. |
+| `--min-total-coverage`, `--min-total` | No | `3` | Minimum total read coverage required for a candidate. |
 | `--min-mapq`, `--min-MQ` | No | `20` | Minimum read mapping quality used during candidate extraction. |
 | `--min-baseq`, `--min-BQ` | No | `10` | Minimum base quality used during candidate extraction. |
 | `--max-depth` | No | `5000` | Maximum depth used during candidate extraction. |
@@ -277,7 +292,7 @@ Filter candidate variants and extract compact HDF5 feature shards from a BAM.
 | `--min-total-coverage`, `--min-total` | No | `3` | Minimum total coverage retained when filtering the candidate table. |
 | `--min-alt` | No | `3` | Minimum ALT-read count retained when filtering the candidate table. |
 | `--shard-size` | No | `100000` | Maximum number of candidate records per HDF5 shard. |
-| `--compression` | No | `lzf` | HDF5 compression method; allowed values are `lzf` and `gzip`. |
+| `--compression` | No | No compression | HDF5 compression method; allowed values are `lzf` and `gzip`. Omit this option to write uncompressed shards. |
 
 ### `somatix predict`
 
@@ -359,7 +374,7 @@ Run the full pipeline: case candidate extraction, paired tumor/normal feature ex
 | `--skip-prediction` | No | `False` | Stop after candidate and feature extraction; do not run DL prediction. |
 | `--min-alt` | No | `3` | Minimum ALT-read count for candidate extraction and feature-input filtering. |
 | `--min-vaf`, `--vaf` | No | `0.05` | Minimum VAF for candidate extraction and feature-input filtering. |
-| `--min-total-coverage`, `--min-total` | No | `10` | Minimum total coverage for candidate extraction and feature-input filtering. |
+| `--min-total-coverage`, `--min-total` | No | `3` | Minimum total coverage for candidate extraction and feature-input filtering. |
 | `--min-mapq`, `--min-MQ` | No | `20` | Minimum read mapping quality used during candidate extraction. |
 | `--min-baseq`, `--min-BQ` | No | `10` | Minimum base quality used during candidate extraction. |
 | `--max-depth` | No | `5000` | Maximum depth used during candidate extraction. |
@@ -368,7 +383,7 @@ Run the full pipeline: case candidate extraction, paired tumor/normal feature ex
 | `--feature-depth`, `--depth` | No | `1000` | Maximum reads sampled per candidate site during feature extraction. |
 | `--chunk-bp` | No | `1000` | Genomic chunk size for chunk-based feature extraction. |
 | `--shard-size` | No | `100000` | Maximum number of candidate records per HDF5 shard. |
-| `--compression` | No | `lzf` | HDF5 compression method; allowed values are `lzf` and `gzip`. |
+| `--compression` | No | No compression | HDF5 compression method; allowed values are `lzf` and `gzip`. Omit this option to write uncompressed shards. |
 
 ### `somatix clean`
 

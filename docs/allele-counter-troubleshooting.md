@@ -69,6 +69,18 @@ sudo apt install -y \
 If `libhts-dev` is unavailable or too old, install HTSlib from source or a
 Conda/Bioconda environment.
 
+## Makefile Options
+
+The `source/somatix/bin/Makefile` supports these variables:
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `HTSLIB_DIR` | empty | Optional directory containing HTSlib headers and libraries. |
+| `USE_RPATH` | `0` | Set to `1` to embed `HTSLIB_DIR` as a runtime library search path. |
+| `PREFIX` | `/usr/local` | Installation prefix used by `make install`. |
+| `CXX` | `g++` | C++ compiler. |
+| `CXXFLAGS` | `-O3 -std=c++17` | C++ compiler flags. |
+
 ## Rebuild with System HTSlib
 
 From the SomatiX repository root:
@@ -76,10 +88,8 @@ From the SomatiX repository root:
 ```bash
 cd source/somatix/bin
 
-g++ -O3 -std=c++17 allele_counter.cpp -o allele_counter \
-  -lhts -lz -lbz2 -llzma -lcurl -lpthread
-
-chmod +x allele_counter
+make clean
+make
 ./allele_counter --help
 ldd ./allele_counter
 ```
@@ -91,7 +101,7 @@ somatix candidates \
   --bam sample_case.bam \
   --ref reference.fa \
   --output case_candidates.txt \
-  --allele-counter "${PWD}/source/somatix/bin/allele_counter"
+  --allele-counter "${PWD}/allele_counter"
 ```
 
 ## Rebuild with a Custom HTSlib Path
@@ -104,10 +114,8 @@ HTSLIB_DIR=/path/to/htslib
 
 cd source/somatix/bin
 
-g++ -O3 -std=c++17 allele_counter.cpp -o allele_counter \
-  -I "${HTSLIB_DIR}" \
-  -L "${HTSLIB_DIR}" \
-  -lhts -lz -lbz2 -llzma -lcurl -lpthread
+make clean
+make HTSLIB_DIR="${HTSLIB_DIR}"
 ```
 
 If the binary compiles but cannot find `libhts` at runtime, set
@@ -116,6 +124,15 @@ If the binary compiles but cannot find `libhts` at runtime, set
 ```bash
 export LD_LIBRARY_PATH="${HTSLIB_DIR}:${LD_LIBRARY_PATH:-}"
 ./allele_counter --help
+```
+
+Alternatively, build with an embedded runtime search path so the binary uses the
+same HTSlib directory used during compilation:
+
+```bash
+make clean
+make HTSLIB_DIR="${HTSLIB_DIR}" USE_RPATH=1
+ldd ./allele_counter | grep hts
 ```
 
 You can also check exactly which library is being used:
@@ -137,9 +154,17 @@ Then pass it with `--allele-counter` when using a source checkout.
 If you want it available globally:
 
 ```bash
-sudo install -m 0755 source/somatix/bin/allele_counter /usr/local/bin/allele_counter
+cd source/somatix/bin
+sudo make install PREFIX=/usr/local
 which allele_counter
 allele_counter --help
+```
+
+To install somewhere else:
+
+```bash
+make install PREFIX="${HOME}/.local"
+export PATH="${HOME}/.local/bin:${PATH}"
 ```
 
 ## Common Errors
@@ -225,6 +250,13 @@ g++ -O3 -std=c++17 allele_counter.cpp -o allele_counter \
 ```
 
 If HTSlib is in a custom location, add `-I` and `-L` paths as shown above.
+
+The equivalent direct compile command is:
+
+```bash
+g++ -O3 -std=c++17 allele_counter.cpp -o allele_counter \
+  -lhts -lz -lbz2 -llzma -lcurl -lpthread
+```
 
 ## Quick Functional Test
 

@@ -8,19 +8,105 @@ import shutil
 import sys
 from contextlib import redirect_stdout
 
-from somatix.bam2tpileup_selfAC import process_bam
-from somatix.snp_feature_extraction_DNA_shard_light import (
-    H5ShardWriter,
-    extract_VCF_feature,
-    filter_vcf,
-)
-from somatix.predict_DNN_somatic import run_predict_dnn_somatic
-from somatix.perm_importance import FEATURE_GROUPS, feature_group_help_text, run_permuted_predict
-
 try:
     from somatix.version import __version__
 except Exception:
     __version__ = "unknown"
+
+
+class SomatiXHelpFormatter(argparse.RawDescriptionHelpFormatter):
+    """Show useful defaults while preserving multiline help text."""
+
+    def _get_help_string(self, action):
+        help_text = action.help
+        if help_text is None:
+            help_text = ""
+        if "%(default)" not in help_text:
+            has_default = action.default is not None and action.default is not argparse.SUPPRESS
+            if action.option_strings and has_default:
+                help_text += " (default: %(default)s)"
+        return help_text
+
+
+DEFAULT_THREADS = 8
+DEFAULT_ALLELE_COUNTER = "allele_counter"
+DEFAULT_MIN_ALT = 3
+DEFAULT_MIN_VAF = 0.05
+DEFAULT_MIN_TOTAL_CANDIDATE_COVERAGE = 3
+DEFAULT_MIN_TOTAL_FEATURE_COVERAGE = 3
+DEFAULT_MIN_MAPQ = 20
+DEFAULT_MIN_BASEQ = 10
+DEFAULT_MAX_DEPTH = 5000
+DEFAULT_EXCL_FLAGS = 2316
+DEFAULT_BLOCK_SIZE = 1_000_000
+DEFAULT_FEATURE_DEPTH = 1000
+DEFAULT_CHUNK_BP = 1000
+DEFAULT_SHARD_SIZE = 100000
+DEFAULT_COMPRESSION = None
+DEFAULT_DEVICE = "cpu"
+DEFAULT_PERM_SAMPLE = "both"
+DEFAULT_PERM_SEED = 2026
+WHOLE_GENOME_HELP = "Optional genomic interval, for example chr1:100000-200000. (default: whole genome)"
+
+
+PERM_FEATURE_GROUPS = {
+    "base_fraction": [
+        "one_hot_encoded_sequence",
+        "ref_base_fractions_forward",
+        "ref_base_fractions_reverse",
+        "alt_base_fractions_forward",
+        "alt_base_fractions_reverse",
+    ],
+    "target_position_coverage": ["target_position_coverage"],
+    "coverage": [
+        "ref_coverage_forward",
+        "ref_coverage_reverse",
+        "alt_coverage_forward",
+        "alt_coverage_reverse",
+    ],
+    "mapq": [
+        "ref_mapq_forward",
+        "ref_mapq_reverse",
+        "alt_mapq_forward",
+        "alt_mapq_reverse",
+    ],
+    "baseq": [
+        "ref_baseq_forward",
+        "ref_baseq_reverse",
+        "alt_baseq_forward",
+        "alt_baseq_reverse",
+    ],
+    "mismatch_rate": [
+        "ref_mismatch_rate_forward",
+        "ref_mismatch_rate_reverse",
+        "alt_mismatch_rate_forward",
+        "alt_mismatch_rate_reverse",
+    ],
+}
+
+
+PERM_FEATURE_GROUP_DESCRIPTIONS = {
+    "base_fraction": (
+        "Five-channel base-fraction branch input: padded sequence context plus "
+        "ref/alt A/C/G/T/DEL/INS base-fraction pileups on forward and reverse strands."
+    ),
+    "target_position_coverage": "Normalized total coverage at the candidate position.",
+    "coverage": "Ref/alt allele coverage pileups on forward and reverse strands.",
+    "mapq": "Mean mapping quality for ref/alt-supporting reads on forward and reverse strands.",
+    "baseq": "Mean base quality for ref/alt-supporting reads on forward and reverse strands.",
+    "mismatch_rate": "Mismatch-rate summaries for ref/alt-supporting reads on forward and reverse strands.",
+}
+
+
+def feature_group_help_text():
+    lines = [
+        "Experimental feature-testing command, not the standard SomatiX prediction workflow.",
+        "Available --feature groups:",
+    ]
+    for name, members in PERM_FEATURE_GROUPS.items():
+        lines.append(f"  {name}: {PERM_FEATURE_GROUP_DESCRIPTIONS[name]}")
+        lines.append(f"    datasets: {', '.join(members)}")
+    return "\n".join(lines)
 
 
 logging.basicConfig(
@@ -71,6 +157,8 @@ def parse_target_chr_from_region(region=None):
 
 def run_extract_candidates(args):
     """Extract candidate SNVs from one BAM using the allele_counter backend."""
+    from somatix.bam2tpileup_selfAC import process_bam
+
     ensure_directory_exists(os.path.dirname(args.output) or ".")
     args.allele_counter = resolve_executable(args.allele_counter, "allele_counter")
     check_required_files([args.bam, args.ref, args.allele_counter])
@@ -137,6 +225,12 @@ def split_and_extract_features(
     The same filtered candidate table should be used for tumor and normal feature
     extraction so both HDF5 shard sets have identical loci and order.
     """
+    from somatix.snp_feature_extraction_DNA_shard_light import (
+        H5ShardWriter,
+        extract_VCF_feature,
+        filter_vcf,
+    )
+
     ensure_directory_exists(os.path.dirname(output_prefix) or ".")
     ensure_directory_exists(os.path.dirname(filtered_prefix) or ".")
 
@@ -232,6 +326,8 @@ def run_extract_features(args):
 
 
 def run_predict(args):
+    from somatix.predict_DNN_somatic import run_predict_dnn_somatic
+
     target_chr = parse_target_chr_from_region(args.region)
     check_required_files([args.model])
 
@@ -261,6 +357,8 @@ def run_predict(args):
 
 
 def run_perm(args):
+    from somatix.perm_importance import run_permuted_predict
+
     target_chr = parse_target_chr_from_region(args.region)
     check_required_files([args.model])
 
@@ -393,6 +491,8 @@ def run_call(args):
         return
 
     logging.info(f"Step 4/4: predicting somatic variants for chromosomes: {final_chr}")
+    from somatix.predict_DNN_somatic import run_predict_dnn_somatic
+
     run_predict_dnn_somatic(
         input_file_case=case_features_prefix,
         input_file_control=control_features_prefix,
@@ -432,19 +532,60 @@ def delete_related_files(outdir):
 
 
 def add_common_candidate_args(parser):
-    parser.add_argument("--min-alt", type=int, default=3)
-    parser.add_argument("--min-vaf", "--vaf", dest="min_vaf", type=float, default=0.05)
-    parser.add_argument("--min-total-coverage", "--min-total", dest="min_total_coverage", type=int, default=10)
-    parser.add_argument("--min-mapq", "--min-MQ", type=int, default=20)
-    parser.add_argument("--min-baseq", "--min-BQ", type=int, default=10)
+    parser.add_argument(
+        "--min-alt",
+        type=int,
+        default=DEFAULT_MIN_ALT,
+        help="Minimum ALT-read count required for a candidate SNV.",
+    )
+    parser.add_argument(
+        "--min-vaf",
+        "--vaf",
+        dest="min_vaf",
+        type=float,
+        default=DEFAULT_MIN_VAF,
+        help="Minimum variant allele fraction required for a candidate SNV.",
+    )
+    parser.add_argument(
+        "--min-total-coverage",
+        "--min-total",
+        dest="min_total_coverage",
+        type=int,
+        default=DEFAULT_MIN_TOTAL_CANDIDATE_COVERAGE,
+        help="Minimum total read coverage required for a candidate SNV.",
+    )
+    parser.add_argument(
+        "--min-mapq",
+        "--min-MQ",
+        type=int,
+        default=DEFAULT_MIN_MAPQ,
+        help="Minimum read mapping quality used during candidate extraction.",
+    )
+    parser.add_argument(
+        "--min-baseq",
+        "--min-BQ",
+        type=int,
+        default=DEFAULT_MIN_BASEQ,
+        help="Minimum base quality used during candidate extraction.",
+    )
     parser.add_argument(
         "--max-depth",
         type=int,
-        default=5000,
-        help="Maximum depth used during candidate extraction. Default: 5000."
+        default=DEFAULT_MAX_DEPTH,
+        help="Maximum depth used during candidate extraction."
     )
-    parser.add_argument("--excl-flags", type=int, default=2316)
-    parser.add_argument("--block-size", type=int, default=1_000_000)
+    parser.add_argument(
+        "--excl-flags",
+        type=int,
+        default=DEFAULT_EXCL_FLAGS,
+        help="SAM flag bitmask for reads to exclude.",
+    )
+    parser.add_argument(
+        "--block-size",
+        type=int,
+        default=DEFAULT_BLOCK_SIZE,
+        help="Genomic block size used while scanning the BAM.",
+    )
 
 
 def add_common_feature_args(parser):
@@ -453,141 +594,242 @@ def add_common_feature_args(parser):
         "--depth",
         dest="feature_depth",
         type=int,
-        default=1000,
-        help="Maximum reads sampled per candidate site during feature extraction. Default: 1000."
+        default=DEFAULT_FEATURE_DEPTH,
+        help="Maximum reads sampled per candidate site during feature extraction."
     )
     parser.add_argument(
         "--chunk-bp",
         type=int,
-        default=1000,
-        help="Genomic chunk size for chunk-based feature extraction. Default: 1000."
+        default=DEFAULT_CHUNK_BP,
+        help="Genomic chunk size for chunk-based feature extraction."
     )
-    parser.add_argument("--min-vaf", "--vaf", dest="min_vaf", type=float, default=0.05)
-    parser.add_argument("--min-total-coverage", "--min-total", dest="min_total_coverage", type=int, default=3)
-    parser.add_argument("--min-alt", type=int, default=3)
-    parser.add_argument("--shard-size", type=int, default=100000)
-    parser.add_argument("--compression", default="lzf", choices=["lzf", "gzip", None])
+    parser.add_argument(
+        "--min-vaf",
+        "--vaf",
+        dest="min_vaf",
+        type=float,
+        default=DEFAULT_MIN_VAF,
+        help="Minimum VAF retained when filtering the candidate table.",
+    )
+    parser.add_argument(
+        "--min-total-coverage",
+        "--min-total",
+        dest="min_total_coverage",
+        type=int,
+        default=DEFAULT_MIN_TOTAL_FEATURE_COVERAGE,
+        help="Minimum total coverage retained when filtering the candidate table.",
+    )
+    parser.add_argument(
+        "--min-alt",
+        type=int,
+        default=DEFAULT_MIN_ALT,
+        help="Minimum ALT-read count retained when filtering the candidate table.",
+    )
+    parser.add_argument(
+        "--shard-size",
+        type=int,
+        default=DEFAULT_SHARD_SIZE,
+        help="Maximum number of candidate records per HDF5 shard.",
+    )
+    parser.add_argument(
+        "--compression",
+        default=DEFAULT_COMPRESSION,
+        choices=["lzf", "gzip"],
+        help="HDF5 compression method for feature shards; omit to disable compression. (default: no compression)",
+    )
 
 
 def add_common_candidate_feature_args(parser):
-    parser.add_argument("--min-alt", type=int, default=3)
-    parser.add_argument("--min-vaf", "--vaf", dest="min_vaf", type=float, default=0.05)
-    parser.add_argument("--min-total-coverage", "--min-total", dest="min_total_coverage", type=int, default=10)
-    parser.add_argument("--min-mapq", "--min-MQ", type=int, default=20)
-    parser.add_argument("--min-baseq", "--min-BQ", type=int, default=10)
+    parser.add_argument(
+        "--min-alt",
+        type=int,
+        default=DEFAULT_MIN_ALT,
+        help="Minimum ALT-read count for candidate extraction and feature-input filtering.",
+    )
+    parser.add_argument(
+        "--min-vaf",
+        "--vaf",
+        dest="min_vaf",
+        type=float,
+        default=DEFAULT_MIN_VAF,
+        help="Minimum VAF for candidate extraction and feature-input filtering.",
+    )
+    parser.add_argument(
+        "--min-total-coverage",
+        "--min-total",
+        dest="min_total_coverage",
+        type=int,
+        default=DEFAULT_MIN_TOTAL_CANDIDATE_COVERAGE,
+        help="Minimum total coverage for candidate extraction and feature-input filtering.",
+    )
+    parser.add_argument(
+        "--min-mapq",
+        "--min-MQ",
+        type=int,
+        default=DEFAULT_MIN_MAPQ,
+        help="Minimum read mapping quality used during candidate extraction.",
+    )
+    parser.add_argument(
+        "--min-baseq",
+        "--min-BQ",
+        type=int,
+        default=DEFAULT_MIN_BASEQ,
+        help="Minimum base quality used during candidate extraction.",
+    )
     parser.add_argument(
         "--max-depth",
         type=int,
-        default=5000,
-        help="Maximum depth used during candidate extraction. Default: 5000."
+        default=DEFAULT_MAX_DEPTH,
+        help="Maximum depth used during candidate extraction."
     )
-    parser.add_argument("--excl-flags", type=int, default=2316)
-    parser.add_argument("--block-size", type=int, default=1_000_000)
+    parser.add_argument(
+        "--excl-flags",
+        type=int,
+        default=DEFAULT_EXCL_FLAGS,
+        help="SAM flag bitmask for reads to exclude.",
+    )
+    parser.add_argument(
+        "--block-size",
+        type=int,
+        default=DEFAULT_BLOCK_SIZE,
+        help="Genomic block size used while scanning the BAM.",
+    )
 
     parser.add_argument(
         "--feature-depth",
         "--depth",
         dest="feature_depth",
         type=int,
-        default=1000,
-        help="Maximum reads sampled per candidate site during feature extraction. Default: 1000."
+        default=DEFAULT_FEATURE_DEPTH,
+        help="Maximum reads sampled per candidate site during feature extraction."
     )
     parser.add_argument(
         "--chunk-bp",
         type=int,
-        default=1000,
-        help="Genomic chunk size for chunk-based feature extraction. Default: 1000."
+        default=DEFAULT_CHUNK_BP,
+        help="Genomic chunk size for chunk-based feature extraction."
     )
 
-    parser.add_argument("--shard-size", type=int, default=100000)
-    parser.add_argument("--compression", default="lzf", choices=["lzf", "gzip", None])
+    parser.add_argument(
+        "--shard-size",
+        type=int,
+        default=DEFAULT_SHARD_SIZE,
+        help="Maximum number of candidate records per HDF5 shard.",
+    )
+    parser.add_argument(
+        "--compression",
+        default=DEFAULT_COMPRESSION,
+        choices=["lzf", "gzip"],
+        help="HDF5 compression method for feature shards; omit to disable compression. (default: no compression)",
+    )
 
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
         prog="somatix",
         description="SomatiX: platform-agnostic somatic SNV calling with tumor-control deep learning.",
+        formatter_class=SomatiXHelpFormatter,
     )
     parser.add_argument("--version", action="version", version=f"SomatiX {__version__}")
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    p = subparsers.add_parser("candidates", help="Extract candidate SNVs from BAM")
-    p.add_argument("--bam", required=True)
-    p.add_argument("--ref", required=True)
-    p.add_argument("--output", required=True)
-    p.add_argument("--region")
-    p.add_argument("--threads", type=int, default=8)
-    p.add_argument("--allele-counter", default="allele_counter")
+    p = subparsers.add_parser(
+        "candidates",
+        help="Extract candidate SNVs from BAM",
+        formatter_class=SomatiXHelpFormatter,
+    )
+    p.add_argument("--bam", required=True, help="Input BAM file to scan for candidate SNVs.")
+    p.add_argument("--ref", required=True, help="Indexed reference FASTA file.")
+    p.add_argument("--output", required=True, help="Output tab-delimited candidate table.")
+    p.add_argument("--region", help=WHOLE_GENOME_HELP)
+    p.add_argument("--threads", type=int, default=DEFAULT_THREADS, help="Number of threads for candidate extraction.")
+    p.add_argument("--allele-counter", default=DEFAULT_ALLELE_COUNTER, help="Path to the allele_counter executable.")
     add_common_candidate_args(p)
 
-    p = subparsers.add_parser("features", help="Extract reduced HDF5 shard features from candidate file")
-    p.add_argument("--candidates", required=True)
-    p.add_argument("--bam", required=True)
-    p.add_argument("--ref", required=True)
-    p.add_argument("--output-prefix", required=True)
-    p.add_argument("--filtered-prefix", required=True)
-    p.add_argument("--threads", type=int, default=8)
-    p.add_argument("--region")
+    p = subparsers.add_parser(
+        "features",
+        help="Extract reduced HDF5 shard features from candidate file",
+        formatter_class=SomatiXHelpFormatter,
+    )
+    p.add_argument("--candidates", required=True, help="Input candidate table, usually from somatix candidates.")
+    p.add_argument("--bam", required=True, help="BAM file used to extract features at candidate loci.")
+    p.add_argument("--ref", required=True, help="Indexed reference FASTA file.")
+    p.add_argument("--output-prefix", required=True, help="Prefix for per-chromosome HDF5 shard directories.")
+    p.add_argument("--filtered-prefix", required=True, help="Prefix for filtered per-chromosome candidate tables.")
+    p.add_argument("--threads", type=int, default=DEFAULT_THREADS, help="Number of threads for feature extraction.")
+    p.add_argument("--region", help=WHOLE_GENOME_HELP)
     add_common_feature_args(p)
 
-    p = subparsers.add_parser("predict", help="Predict somatic variants from HDF5 shard features")
-    p.add_argument("--case-features-prefix", required=True)
-    p.add_argument("--control-features-prefix", required=True)
-    p.add_argument("--variant-prefix", required=True)
-    p.add_argument("--model", required=True)
-    p.add_argument("--output", required=True)
-    p.add_argument("--bam")
-    p.add_argument("--device", default="cpu")
-    p.add_argument("--region")
+    p = subparsers.add_parser(
+        "predict",
+        help="Predict somatic variants from HDF5 shard features",
+        formatter_class=SomatiXHelpFormatter,
+    )
+    p.add_argument("--case-features-prefix", required=True, help="Prefix for case/tumor feature shard directories.")
+    p.add_argument("--control-features-prefix", required=True, help="Prefix for matched-normal/control feature shard directories.")
+    p.add_argument("--variant-prefix", required=True, help="Prefix for filtered candidate tables used to align variants with feature shards.")
+    p.add_argument("--model", required=True, help="PyTorch model checkpoint used for prediction.")
+    p.add_argument("--output", required=True, help="Output prediction table path.")
+    p.add_argument("--bam", help="Optional BAM path used to annotate VCF contigs.")
+    p.add_argument("--device", default=DEFAULT_DEVICE, help="Device for model inference, such as cpu or cuda:0.")
+    p.add_argument("--region", help="Optional genomic interval; prediction checks and runs only the selected chromosome. (default: whole genome)")
 
     p = subparsers.add_parser(
         "perm",
         help="Predict after permuting one selected HDF5 feature across samples",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        formatter_class=SomatiXHelpFormatter,
         epilog=feature_group_help_text(),
     )
-    p.add_argument("--case-features-prefix", required=True)
-    p.add_argument("--control-features-prefix", required=True)
-    p.add_argument("--variant-prefix", required=True)
-    p.add_argument("--model", required=True)
-    p.add_argument("--output", required=True)
+    p.add_argument("--case-features-prefix", required=True, help="Prefix for case/tumor feature shard directories.")
+    p.add_argument("--control-features-prefix", required=True, help="Prefix for matched-normal/control feature shard directories.")
+    p.add_argument("--variant-prefix", required=True, help="Prefix for filtered candidate tables used to align variants with feature shards.")
+    p.add_argument("--model", required=True, help="PyTorch model checkpoint used for prediction.")
+    p.add_argument("--output", required=True, help="Output prediction table path.")
     p.add_argument(
         "--feature",
         required=True,
-        choices=list(FEATURE_GROUPS.keys()),
-        help="One feature group to permute across samples before prediction."
+        choices=list(PERM_FEATURE_GROUPS.keys()),
+        help="One feature group to permute across samples before prediction.",
     )
     p.add_argument(
         "--sample",
         choices=["case", "control", "both"],
-        default="both",
-        help="Which sample tower to permute for each selected feature."
+        default=DEFAULT_PERM_SAMPLE,
+        help="Which sample tower to permute for each selected feature.",
     )
-    p.add_argument("--bam")
-    p.add_argument("--device", default="cpu")
-    p.add_argument("--seed", type=int, default=2026)
-    p.add_argument("--region")
+    p.add_argument("--bam", help="Optional BAM path used to annotate VCF contigs.")
+    p.add_argument("--device", default=DEFAULT_DEVICE, help="Device for model inference, such as cpu or cuda:0.")
+    p.add_argument("--seed", type=int, default=DEFAULT_PERM_SEED, help="Random seed used to shuffle sample order.")
+    p.add_argument("--region", help="Optional genomic interval; prediction checks and runs only the selected chromosome. (default: whole genome)")
 
-    p = subparsers.add_parser("call", help="Run full SomatiX pipeline")
-    p.add_argument("--bam-case", required=True)
-    p.add_argument("--bam-control", required=True)
-    p.add_argument("--ref", required=True)
-    p.add_argument("--model", required=False)
-    p.add_argument("--outdir", required=True)
-    p.add_argument("--region")
-    p.add_argument("--threads", type=int, default=8)
-    p.add_argument("--allele-counter", default="allele_counter")
-    p.add_argument("--device", default="cpu")
+    p = subparsers.add_parser(
+        "call",
+        help="Run full SomatiX pipeline",
+        formatter_class=SomatiXHelpFormatter,
+    )
+    p.add_argument("--bam-case", required=True, help="Case/tumor BAM file.")
+    p.add_argument("--bam-control", required=True, help="Matched normal/control BAM file.")
+    p.add_argument("--ref", required=True, help="Indexed reference FASTA file.")
+    p.add_argument("--model", required=False, help="PyTorch model checkpoint used for prediction. Required unless --skip-prediction is set.")
+    p.add_argument("--outdir", required=True, help="Output directory for candidates, features and prediction results.")
+    p.add_argument("--region", help=WHOLE_GENOME_HELP)
+    p.add_argument("--threads", type=int, default=DEFAULT_THREADS, help="Number of threads used by candidate and feature extraction.")
+    p.add_argument("--allele-counter", default=DEFAULT_ALLELE_COUNTER, help="Path to the allele_counter executable.")
+    p.add_argument("--device", default=DEFAULT_DEVICE, help="Device for model inference, such as cpu or cuda:0.")
     p.add_argument(
         "--skip-prediction",
         action="store_true",
-        help="Stop after candidate extraction and case/control feature extraction; do not run DL prediction."
+        help="Stop after candidate extraction and case/control feature extraction; do not run DL prediction.",
     )
     add_common_candidate_feature_args(p)
 
-    p = subparsers.add_parser("clean", help="Clean intermediate files")
-    p.add_argument("--outdir", required=True)
+    p = subparsers.add_parser(
+        "clean",
+        help="Clean intermediate files",
+        formatter_class=SomatiXHelpFormatter,
+    )
+    p.add_argument("--outdir", required=True, help="SomatiX output directory containing intermediate files to remove.")
 
     return parser.parse_args()
 

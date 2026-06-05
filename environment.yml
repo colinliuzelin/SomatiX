@@ -1,4 +1,5 @@
 name: somatix
+channels:
   - conda-forge
   - bioconda
   - defaults
@@ -12,9 +13,19 @@ dependencies:
   - matplotlib
   - progressbar33
   - pip
+  - setuptools
   - pytorch
   - htslib
 
-# Note: PyTorch is omitted from this file so you can install a GPU-enabled
-# build that matches your system CUDA runtime. See `conda_install_commands.sh`
-# and `README.md` for PyTorch install examples.
+# Runtime package coverage:
+#   numpy, pandas, h5py, pysam, progressbar33 and pytorch are required by the
+#   SomatiX CLI. htslib supports pysam/allele_counter library compatibility.
+#   pip and setuptools are used for `pip install .`.
+#   scikit-learn and matplotlib are retained for compatibility with auxiliary
+#   analysis/training workflows, although they are not required by the core CLI.
+#
+# GPU note:
+#   This file installs PyTorch from Conda. If you want to run SomatiX on a GPU,
+#   install a PyTorch build that matches your NVIDIA driver and CUDA runtime.
+#   See the official PyTorch installation selector for the correct
+#   CUDA-specific command for your system.
