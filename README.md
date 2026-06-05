@@ -45,19 +45,20 @@ conda env create -f environment.yml -n somatix
 conda activate somatix
 ```
 
-`environment.yml` installs the required Python packages, including PyTorch.
-If you want to run SomatiX on GPU, install a PyTorch build that matches your
-system CUDA runtime. Example commands:
+`environment.yml` installs the required Python packages, including a default
+PyTorch build. The commands below are optional and are only needed if you want
+to replace the default PyTorch build, for example to use CPU-only PyTorch or GPU
+acceleration. For GPU acceleration, install a CUDA-enabled PyTorch build
+compatible with your NVIDIA driver. Conda may install, upgrade, or downgrade
+PyTorch-related dependencies when resolving the selected build. Example
+commands:
 
 ```bash
-# CPU-only (conda, official PyTorch channel)
-conda install -y pytorch torchvision torchaudio cpuonly -c pytorch
+# Optional: CPU-only PyTorch
+conda install -y pytorch cpuonly -c pytorch
 
-# CUDA 12.1 (example; change to the CUDA version you have)
-conda install -y pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
-
-# Or use pip with the appropriate wheel index (example for CUDA 11.8):
-pip install --index-url https://download.pytorch.org/whl/cu118 torch torchvision torchaudio
+# Optional: CUDA 12.1 PyTorch; change the CUDA version if needed
+conda install -y pytorch pytorch-cuda=12.1 -c pytorch -c nvidia
 ```
 
 Install SomatiX in this conda environment:
