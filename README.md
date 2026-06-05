@@ -43,10 +43,11 @@ from the included `environment.yml`:
 ```bash
 conda env create -f environment.yml -n somatix
 conda activate somatix
+```
 
-# IMPORTANT: `environment.yml` does NOT install PyTorch by default. Install
-# PyTorch separately to match your system CUDA runtime (or use a CPU-only
-# build). Example commands:
+`environment.yml` installs the required Python packages, including PyTorch.
+If you want to run SomatiX on GPU, install a PyTorch build that matches your
+system CUDA runtime. Example commands:
 
 ```bash
 # CPU-only (conda, official PyTorch channel)
@@ -59,7 +60,9 @@ conda install -y pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c 
 pip install --index-url https://download.pytorch.org/whl/cu118 torch torchvision torchaudio
 ```
 
-# Install somatix in this conda environment:
+Install SomatiX in this conda environment:
+
+```bash
 pip install .                                    # installs in ~5 seconds
 ```
 
