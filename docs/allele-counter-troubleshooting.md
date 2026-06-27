@@ -50,24 +50,93 @@ GLIBC_2.38 not found
 `GLIBC_* not found` means the binary was built on a newer Linux system than the
 one used to run it. Rebuild locally or use the SingularityCE image.
 
-## Install Build Dependencies
+## Install HTSlib and Build Dependencies
 
-On Ubuntu/Debian systems, install a compiler and HTSlib development headers:
+`allele_counter` directly depends on HTSlib. When linking against HTSlib, the
+final executable may also need HTSlib's compression/network/threading
+dependencies:
+
+- `zlib`: linked with `-lz`
+- `bzip2`: linked with `-lbz2`
+- `xz/liblzma`: linked with `-llzma`
+- `libcurl`: linked with `-lcurl`
+- pthreads: linked with `-lpthread`
+
+### Option A: Use the System HTSlib Package
+
+On Ubuntu/Debian systems, install HTSlib and the required compiler/development
+libraries with:
 
 ```bash
 sudo apt update
 sudo apt install -y \
   build-essential \
   g++ \
+  libhts-dev \
   zlib1g-dev \
   libbz2-dev \
   liblzma-dev \
-  libcurl4-openssl-dev \
-  libhts-dev
+  libcurl4-openssl-dev
 ```
 
-If `libhts-dev` is unavailable or too old, install HTSlib from source or a
-Conda/Bioconda environment.
+### Option B: Use Conda/Bioconda HTSlib
+
+With Conda/Bioconda, install HTSlib and the related libraries with:
+
+```bash
+conda install -y -c conda-forge -c bioconda \
+  htslib \
+  zlib \
+  bzip2 \
+  xz \
+  libcurl \
+  cxx-compiler \
+  make
+```
+
+If using the Conda/Bioconda HTSlib, compile `allele_counter` against the
+headers and libraries in the active conda environment:
+
+```bash
+cd source/somatix/bin
+
+g++ -O3 -std=c++17 allele_counter.cpp -o allele_counter \
+  -I"${CONDA_PREFIX}/include" \
+  -L"${CONDA_PREFIX}/lib" \
+  -Wl,-rpath,"${CONDA_PREFIX}/lib" \
+  -lhts -lz -lbz2 -llzma -lcurl -lpthread
+```
+
+### Option C: Build HTSlib From Source
+
+If the system `libhts-dev` package is unavailable or too old, build HTSlib from
+the official [samtools/htslib](https://github.com/samtools/htslib) source
+repository. First install the compiler and libraries needed to build HTSlib:
+
+```bash
+sudo apt update
+sudo apt install -y \
+  build-essential \
+  autoconf \
+  automake \
+  libtool \
+  g++ \
+  zlib1g-dev \
+  libbz2-dev \
+  liblzma-dev \
+  libcurl4-openssl-dev
+```
+
+Then build HTSlib:
+
+```bash
+git clone https://github.com/samtools/htslib.git
+cd htslib
+autoreconf -i
+./configure --prefix="${HOME}/.local"
+make
+make install
+```
 
 ## Makefile Options
 
@@ -190,6 +259,53 @@ Options:
 - set `LD_LIBRARY_PATH` to the directory containing `libhts.so`
 - use the SingularityCE image
 
+### Other shared libraries are missing
+
+`allele_counter` may also fail if an HTSlib dependency is missing from the
+runtime environment, for example:
+
+```text
+error while loading shared libraries: libbz2.so.1.0: cannot open shared object file: No such file or directory
+```
+
+Similar errors can occur for `libz`, `liblzma`, `libcurl`, `libstdc++` or other
+shared libraries. Check missing libraries with:
+
+```bash
+ldd source/somatix/bin/allele_counter
+```
+
+On Ubuntu/Debian systems, install the common runtime/development packages with:
+
+```bash
+sudo apt update
+sudo apt install -y \
+  zlib1g \
+  libbz2-1.0 \
+  liblzma5 \
+  libcurl4 \
+  libstdc++6
+```
+
+With Conda/Bioconda, install the corresponding libraries in the active
+environment and make sure the conda library directory is visible:
+
+```bash
+conda install -y -c conda-forge \
+  zlib \
+  bzip2 \
+  xz \
+  libcurl \
+  libstdcxx-ng
+
+export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH:-}"
+ldd source/somatix/bin/allele_counter
+```
+
+If several libraries are missing, rebuilding `allele_counter` on the target
+system or using the SingularityCE image is usually safer than manually fixing
+one library at a time.
+
 ### HTSlib is installed, but the requested `libhts.so.*` file does not exist
 
 Sometimes HTSlib is installed successfully, but `allele_counter` still fails
@@ -250,13 +366,8 @@ g++ -O3 -std=c++17 allele_counter.cpp -o allele_counter \
 ```
 
 If HTSlib is in a custom location, add `-I` and `-L` paths as shown above.
-
-The equivalent direct compile command is:
-
-```bash
-g++ -O3 -std=c++17 allele_counter.cpp -o allele_counter \
-  -lhts -lz -lbz2 -llzma -lcurl -lpthread
-```
+For Conda/Bioconda HTSlib, use the `${CONDA_PREFIX}` compile command shown in
+the Conda section.
 
 ## Quick Functional Test
 
