@@ -87,8 +87,18 @@ with `make HTSLIB_DIR=/path/to/htslib` from `source/somatix/bin`. See
 for build and library troubleshooting.
 
 ### Option 2: SingularityCE (recommended)
-Ensure you have **SingularityCE** installed, then pull the `somatix` container
-from the Sylabs Library to use it instantly without installation:
+Even when using SingularityCE, first clone the SomatiX repository, or download
+it from GitHub and enter the repository root. The repository provides the
+example workflows and is the recommended place to keep updated model
+checkpoints under `model/`:
+
+```bash
+git clone git@github.com:colinliuzelin/SomatiX.git
+cd SomatiX
+```
+
+Then pull the `somatix` container from the Sylabs Library to use the runtime
+without installing Python dependencies locally:
 
 ```bash
 singularity pull library://zlliu95/somatix/somatix:latest

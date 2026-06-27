@@ -76,6 +76,15 @@ somatix
 
 ### Option 2: SingularityCE
 
+If you have not cloned SomatiX yet, clone the repository first. The
+Singularity image provides the runtime, but this case study still uses the
+repository root for example files and model checkpoints:
+
+```bash
+git clone git@github.com:colinliuzelin/SomatiX.git
+cd SomatiX
+```
+
 ```bash
 singularity pull library://zlliu95/somatix/somatix:latest
 SOMATIX_SIF="${PWD}/somatix_latest.sif"
