@@ -1,0 +1,25 @@
+# Allow only build inputs; never send local datasets, credentials or SIFs.
+**
+!Dockerfile
+!.dockerignore
+!README.md
+!LICENSE
+!source/
+!source/**
+!model/
+!model/somatix_ont_multicancer.pth
+!model/somatix_ont_hcc1395.pth
+!model/somatix_pacbio_multicancer.pth
+!model/somatix_pacbio_hcc1395.pth
+!docker/
+!docker/environment.yml
+!docker/somatix
+!docker/smoke_test.py
+source/somatix/bin/allele_counter
+**/__pycache__
+**/*.pyc
+**/*.bam
+**/*.bai
+**/*.h5
+**/*.hdf5
+**/*.sif

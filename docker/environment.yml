@@ -1,0 +1,18 @@
+name: somatix-container
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - python=3.12
+  - numpy
+  - pandas
+  - h5py
+  - pysam
+  - progressbar33
+  - pytorch=2.11.0=cpu*
+  - htslib
+  - zlib
+  - bzip2
+  - xz
+  - libcurl

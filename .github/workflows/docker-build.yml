@@ -1,0 +1,88 @@
+name: Publish SomatiX to Docker Hub
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dockerhub-somatix
+  cancel-in-progress: false
+
+jobs:
+  build-test-publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      IMAGE_NAME: zlliu95/somatix
+    steps:
+      - name: Check configuration
+        env:
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          test "$GITHUB_REF" = refs/heads/main || {
+            echo "::error::Select the main branch when running this workflow."
+            exit 1
+          }
+          test "$DOCKERHUB_USERNAME" = zlliu95 || {
+            echo "::error::Set repository variable DOCKERHUB_USERNAME to zlliu95."
+            exit 1
+          }
+          test -n "$DOCKERHUB_TOKEN" || {
+            echo "::error::Set repository secret DOCKERHUB_TOKEN."
+            exit 1
+          }
+
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+      - name: Build CPU image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: somatix:ci
+          build-args: SOURCE_REVISION=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test container as a non-root user
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" \
+            somatix:ci --version
+          docker run --rm --user "$(id -u):$(id -g)" \
+            --entrypoint python somatix:ci \
+            /opt/SomatiX/docker/smoke_test.py --require-cpu
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Publish the exact image tested above, without rebuilding it.
+      - name: Publish tested image
+        run: |
+          docker tag somatix:ci "$IMAGE_NAME:sha-$GITHUB_SHA"
+          docker tag somatix:ci "$IMAGE_NAME:latest"
+          docker push "$IMAGE_NAME:sha-$GITHUB_SHA"
+          docker push "$IMAGE_NAME:latest"
+          {
+            echo "### Published SomatiX CPU image"
+            echo "Image: \`$IMAGE_NAME:latest\`"
+            echo "Commit tag: \`$IMAGE_NAME:sha-$GITHUB_SHA\`"
+            echo "Models: \`/opt/SomatiX/model\` (all four checkpoints)."
+            echo '```text'
+            docker image inspect "$IMAGE_NAME:latest" --format '{{json .RepoDigests}}'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
