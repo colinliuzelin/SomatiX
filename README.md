@@ -5,6 +5,9 @@ SomatiX is a deep-learning variant caller for accurate and fast somatic SNV dete
 ## Contents
 
 - [Installation](#installation)
+  - [Conda](#option-1-conda)
+  - [Singularity from Apptainer (recommended)](#option-2-singularity-from-apptainer-recommended)
+  - [Docker](#option-3-docker)
 - [Case Study](#case-study)
 - [Quick Start and Overview](#quick-start-and-overview)
 - [Model Architecture](#model-architecture)
@@ -81,38 +84,76 @@ Because the bundled binary is dynamically linked, it requires compatible system
 and `htslib` shared libraries at runtime, especially `glibc`, `libstdc++` and
 `libhts`. If the bundled binary fails to load because of missing or incompatible
 shared libraries, rebuild `allele_counter` from source on the target system or
-use the Singularity image. If HTSlib is installed in a custom location, build
+use the container below. If HTSlib is installed in a custom location, build
 with `make HTSLIB_DIR=/path/to/htslib` from `source/somatix/bin`. See
 [docs/allele-counter-troubleshooting.md](docs/allele-counter-troubleshooting.md)
 for build and library troubleshooting.
 
-### Option 2: SingularityCE (recommended)
-Even when using SingularityCE, first clone the SomatiX repository, or download
-it from GitHub and enter the repository root. The repository provides the
-example workflows and is the recommended place to keep updated model
-checkpoints under `model/`:
+### Option 2: Singularity from Apptainer (recommended)
+Use Apptainer through its `singularity` compatibility command to pull the SomatiX image from
+[Docker Hub](https://hub.docker.com/r/zlliu95/somatix) and run it as a SIF.
+
+The examples consistently use the `singularity` command. Docker itself is not
+required.
 
 ```bash
-git clone git@github.com:colinliuzelin/SomatiX.git
-cd SomatiX
+singularity pull somatix_docker_latest.sif docker://zlliu95/somatix:latest
+singularity exec --cleanenv somatix_docker_latest.sif somatix --version
+singularity exec --cleanenv somatix_docker_latest.sif somatix call --help
 ```
 
-Then pull the `somatix` container from the Sylabs Library to use the runtime
-without installing Python dependencies locally:
+The image has been tested with Apptainer.
+
+The image is CPU-only for Linux x86-64 (`linux/amd64`). It includes Python
+dependencies, `allele_counter` compiled against the image's own libraries,
+and all four model checkpoints under `/opt/SomatiX/model/`. No external
+`allele_counter` or local Python installation is needed. Use `--cleanenv` to
+avoid inheriting unrelated host Conda/Python environment settings.
+
+For example, with indexed BAM and reference files in the current directory:
 
 ```bash
-singularity pull library://zlliu95/somatix/somatix:latest
+singularity exec --cleanenv --bind "${PWD}:/data" \
+  somatix_docker_latest.sif somatix call \
+  --bam-case /data/tumor.bam \
+  --bam-control /data/normal.bam \
+  --ref /data/reference.fa \
+  --model /opt/SomatiX/model/somatix_ont_multicancer.pth \
+  --outdir /data/somatix_output \
+  --region chr1 --threads 8
 ```
 
-Use SingularityCE for this `library://` pull command. Apptainer is a separate
-fork of Singularity and may use a different default remote; an Apptainer binary
-exposed as `singularity` may not be able to pull from the Sylabs `library://`
-endpoint.
+For PacBio HiFi, select `somatix_pacbio_multicancer.pth` instead. Omit
+`--region` for whole-genome calling. Clone or download the repository when
+using the case-study workflows or newer external checkpoints; cloning is not
+required to run the bundled models. External files must be accessible through
+a container bind mount.
 
-The Singularity image embeds the required `allele_counter` binary and its
-runtime library environment, so users do not need to rebuild `allele_counter` or
-manage its shared-library compatibility separately. Also ensure your FASTA and
-BAM files are indexed (`samtools faidx` and `samtools index`).
+### Option 3: Docker
+The same CPU image can be run directly with Docker:
+
+```bash
+docker pull zlliu95/somatix:latest
+docker run --rm zlliu95/somatix:latest --version
+docker run --rm zlliu95/somatix:latest call --help
+
+docker run --rm --user "$(id -u):$(id -g)" \
+  --volume "${PWD}:/data" \
+  zlliu95/somatix:latest call \
+  --bam-case /data/tumor.bam \
+  --bam-control /data/normal.bam \
+  --ref /data/reference.fa \
+  --model /opt/SomatiX/model/somatix_ont_multicancer.pth \
+  --outdir /data/somatix_output \
+  --region chr1 --threads 8
+```
+
+The image entry point is `somatix`, so Docker arguments start with `call`,
+`predict`, or another subcommand. The `--user` option keeps output files owned
+by your Linux user. Ensure the reference FASTA and BAMs are indexed before
+running (`samtools faidx` and `samtools index`). For reproducible analyses,
+record the image digest or use a published `sha-<git-commit>` tag instead of
+the moving `latest` tag.
 
 ---
 
@@ -168,6 +209,9 @@ SomatiX/
     somatix_pacbio_multicancer.pth
     somatix_pacbio_hcc1395.pth
 ```
+
+The container image already includes these four files at
+`/opt/SomatiX/model/`; use that path for bundled checkpoints in container runs.
 
 Available model types:
 

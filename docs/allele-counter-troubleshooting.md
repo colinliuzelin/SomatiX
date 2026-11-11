@@ -9,22 +9,23 @@ SomatiX provides:
 - a precompiled Linux binary: `source/somatix/bin/allele_counter`
 - the source code: `source/somatix/bin/allele_counter.cpp`
 
-If the precompiled binary does not run on your system, either use the
-SingularityCE container or rebuild `allele_counter` locally against your own
+If the precompiled binary does not run on your system, either use the SomatiX
+container or rebuild `allele_counter` locally against your own
 system libraries.
 
-## Recommended Option: Use SingularityCE
+## Recommended Option: Use Singularity from Apptainer
 
-The SingularityCE image embeds `allele_counter` and the compatible runtime
+The Docker Hub image embeds `allele_counter` and the compatible runtime
 libraries:
 
 ```bash
-singularity pull library://zlliu95/somatix/somatix:latest
-singularity exec somatix_latest.sif somatix --version
+singularity pull somatix_docker_latest.sif docker://zlliu95/somatix:latest
+singularity exec --cleanenv somatix_docker_latest.sif somatix --version
 ```
 
-Use SingularityCE for the `library://` pull command. Apptainer is a separate
-fork of Singularity and may use a different default remote.
+The examples use Apptainer's `singularity` compatibility command. See the
+[README installation section](../README.md#option-2-singularity-from-apptainer-recommended).
+These commands use Docker Hub and do not require a local Docker installation.
 
 ## Check Whether the Bundled Binary Works
 
@@ -48,7 +49,7 @@ GLIBC_2.38 not found
 ```
 
 `GLIBC_* not found` means the binary was built on a newer Linux system than the
-one used to run it. Rebuild locally or use the SingularityCE image.
+one used to run it. Rebuild locally or use the SomatiX container.
 
 ## Install HTSlib and Build Dependencies
 
@@ -257,7 +258,7 @@ Options:
 - install `libhts-dev` / `libhts`
 - rebuild `allele_counter` against the HTSlib on your system
 - set `LD_LIBRARY_PATH` to the directory containing `libhts.so`
-- use the SingularityCE image
+- use the SomatiX container
 
 ### Other shared libraries are missing
 
@@ -303,7 +304,7 @@ ldd source/somatix/bin/allele_counter
 ```
 
 If several libraries are missing, rebuilding `allele_counter` on the target
-system or using the SingularityCE image is usually safer than manually fixing
+system or using the SomatiX container is usually safer than manually fixing
 one library at a time.
 
 ### HTSlib is installed, but the requested `libhts.so.*` file does not exist
@@ -353,7 +354,7 @@ remove the symlink and rebuild `allele_counter` from source instead.
 ### `GLIBC_2.xx not found`
 
 The bundled binary was built on a newer Linux system. Rebuild locally on the
-target machine or use the SingularityCE image.
+target machine or use the SomatiX container.
 
 ### `undefined reference to hts_*` during compilation
 

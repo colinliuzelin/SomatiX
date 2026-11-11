@@ -74,10 +74,10 @@ with:
 somatix
 ```
 
-### Option 2: SingularityCE
+### Option 2: Singularity from Apptainer
 
 If you have not cloned SomatiX yet, clone the repository first. The
-Singularity image provides the runtime, but this case study still uses the
+container provides the runtime, but this case study still uses the
 repository root for example files and model checkpoints:
 
 ```bash
@@ -86,16 +86,18 @@ cd SomatiX
 ```
 
 ```bash
-singularity pull library://zlliu95/somatix/somatix:latest
-SOMATIX_SIF="${PWD}/somatix_latest.sif"
+singularity pull somatix_docker_latest.sif docker://zlliu95/somatix:latest
+SOMATIX_SIF="${PWD}/somatix_docker_latest.sif"
 ```
 
-Use SingularityCE for the `library://` pull command above. Apptainer is a
-separate fork of Singularity and may use a different default remote; an
-Apptainer binary exposed as `singularity` may not be able to pull from the
-Sylabs `library://` endpoint.
+The container commands in this case study use Apptainer's `singularity`
+compatibility command. See the
+[README installation section](../README.md#option-2-singularity-from-apptainer-recommended)
+for installation details.
 
-The Singularity image includes the required `allele_counter` binary. The
+The CPU-only image includes the required `allele_counter` binary and all four
+model checkpoints at `/opt/SomatiX/model/`. This example uses the checkpoints
+in the repository's `model/` directory. The
 container command below uses the bundled default and does not require an
 external `--allele-counter` path.
 
@@ -181,14 +183,14 @@ ${PYTHON_BIN} "${SOMATIX_DIR}/source/somatix-runner.py" call \
   --chunk-bp 1000
 ```
 
-## Run SomatiX with Singularity
+## Run SomatiX with Singularity from Apptainer
 
-When using the Singularity image, run the same `call` workflow inside the
+When using the container, run the same `call` workflow inside the
 container. The image includes `allele_counter`, so no external
 `--allele-counter` argument is needed:
 
 ```bash
-singularity exec \
+singularity exec --cleanenv \
   -B "${BASE}:${BASE}" \
   -B "${MODEL_DIR}:${MODEL_DIR}" \
   "${SOMATIX_SIF}" \
@@ -234,14 +236,27 @@ QUERY_VCF="${OUTPUT_DIR}/somatix_pacbio_chr1/somatix_predict.vcf"
 The following example benchmarks the SomatiX VCF against the SEQC2 HCC1395
 truth set using `som.py` from hap.py. Only chromosome 1 is evaluated.
 
+This step uses a separate hap.py SIF containing `/opt/hap.py/bin/som.py`;
+hap.py is not included in the SomatiX image. Pull it from
+`docker://pkrusche/hap.py:latest` using Apptainer's `singularity` command,
+or set `HAP_PY_SIF` to an existing local copy.
+
+**Compatibility note:** This hap.py pull was tested with Apptainer 1.1.9.
+The upstream image uses a legacy Docker manifest that some newer runtimes
+reject. If you encounter a manifest error, reuse a previously converted
+hap.py SIF. This limitation applies to the hap.py download, not the SomatiX image.
+
 ```bash
-HAP_PY_SIF="${PWD}/hap.py_latest.sif"
-singularity pull "${HAP_PY_SIF}" library://zlliu95/hap.py/hap.py:latest
+HAP_PY_SIF="${HAP_PY_SIF:-${PWD}/hap.py_latest.sif}"
+
+if [[ ! -f "${HAP_PY_SIF}" ]]; then
+  singularity pull "${HAP_PY_SIF}" docker://pkrusche/hap.py:latest
+fi
 
 SOMPY_OUT="${OUTPUT_DIR}/sompy_output/somatix_pacbio_chr1"
 mkdir -p "$(dirname "${SOMPY_OUT}")"
 
-singularity exec \
+singularity exec --cleanenv \
   -B "${INPUT_DIR}:${INPUT_DIR}" \
   -B "${OUTPUT_DIR}:${OUTPUT_DIR}" \
   "${HAP_PY_SIF}" \
@@ -332,10 +347,10 @@ ${PYTHON_BIN} "${SOMATIX_DIR}/source/somatix-runner.py" clean \
   --outdir "${OUTPUT_DIR}/somatix_pacbio_chr1"
 ```
 
-For Singularity runs:
+For container runs:
 
 ```bash
-singularity exec \
+singularity exec --cleanenv \
   -B "${BASE}:${BASE}" \
   "${SOMATIX_SIF}" \
   somatix clean \
@@ -349,5 +364,5 @@ singularity exec \
   replace it with another interval for larger analyses.
 - `--chunk-bp 1000` is the current default and is shown explicitly for
   reproducibility.
-- Use `--device cuda:0` in `predict` or `call` if a compatible GPU and PyTorch
-  installation are available.
+- The published container uses CPU-only PyTorch. Use `--device cuda:0` only
+  with a separate Conda/source installation that has compatible GPU support.
